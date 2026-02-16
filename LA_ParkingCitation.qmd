@@ -1,0 +1,84 @@
+---
+title: "Los Angeles Parking Citation Analysis"
+format:
+  html:
+    embed-resources: true
+jupyter: python3
+---
+
+
+
+### Introduction
+
+
+```{python}
+import requests
+import pandas as pd
+import time
+import os
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+
+# APP_TOKEN = os.getenv("SOCRATA_APP_TOKEN")
+
+# url = "https://data.lacity.org/resource/4f5p-udkv.json"
+
+# headers = {
+#     "X-App-Token": APP_TOKEN
+# }
+
+
+# years = [2021, 2022, 2023, 2024, 2025]
+# limit = 50000
+
+# for year in years:
+    
+#     print(f"\nFetching {year} data...")
+    
+#     all_data = []
+#     offset = 0
+    
+#     while True:
+        
+#         params = {
+#             "$select": "ticket_number, issue_date, issue_time, violation_code, violation_description, fine_amount, loc_lat, loc_long, make, body_style_desc",
+#             "$where": f"issue_date >= '{year}-01-01T00:00:00.000' AND issue_date < '{year+1}-01-01T00:00:00.000'",
+#             "$limit": limit,
+#             "$offset": offset
+#         }
+        
+#         response = requests.get(url, headers=headers, params=params)
+        
+#         if response.status_code != 200:
+#             print("Error:", response.status_code)
+#             break
+        
+#         data = response.json()
+        
+#         if not data:
+#             break
+        
+#         all_data.extend(data)
+#         print(f"Year {year}: fetched {len(all_data)} rows")
+        
+#         offset += limit
+    
+#     df = pd.DataFrame(all_data)
+    
+#     df.to_csv(f"la_parking_{year}.csv", index=False)
+    
+#     print(f"{year} complete. Saved {len(df)} rows.")
+```
+
+
+```{python}
+
+
+```
+### Methods
+
+
+### Preliminary Results
+
+
+### Summary
