@@ -27,6 +27,7 @@ import seaborn as sns
 import plotly.express as px
 import plotly.graph_objects as go
 
+
 # APP_TOKEN = os.getenv("SOCRATA_APP_TOKEN")
 
 # url = "https://data.lacity.org/resource/4f5p-udkv.json"
@@ -150,6 +151,9 @@ df.info(show_counts=True)
 
 ### Data Cleaning and Preprocessing
 ```{python}
+#| echo: false
+#| output: false
+
 df_complete = df.dropna()
 
 print("Original rows:", df.shape[0])
@@ -162,6 +166,9 @@ print("Remaining percentage:", round(remaining_ratio * 100, 2), "%")
 ```
 
 ```{python}
+#| echo: false
+#| output: false
+
 df_complete.info(show_counts=True)
 df_complete.shape
 df_complete.dtypes
@@ -174,6 +181,9 @@ df_complete.describe()
 
 #### Date range
 ```{python}
+#| echo: false
+#| output: false
+
 dates = pd.to_datetime(df[["year","month","day"]], errors="coerce")
 
 print("date min:", dates.min())
@@ -184,6 +194,9 @@ print("invalid dates (NaT):", dates.isna().sum())
 
 #### Hour validity
 ```{python}
+#| echo: false
+#| output: false
+
 print("Hour min:", df_complete["hour"].min())
 print("Hour max:", df_complete["hour"].max())
 
@@ -195,6 +208,9 @@ print("Rows with invalid hour:", len(invalid_hours))
 
 #### Geographic filtering
 ```{python}
+#| echo: false
+#| output: false
+
 
 lat_min, lat_max = 33.5, 34.5
 lon_min, lon_max = -119.0, -117.5
@@ -223,6 +239,9 @@ print("Remaining percentage:",
 
 #### Extreme fine values
 ```{python}
+#| echo: false
+#| output: false
+
 print("Fine min:", df_complete["fine_amount"].min())
 print("Fine max:", df_complete["fine_amount"].max())
 
@@ -231,20 +250,173 @@ print(top10_fines)
 
 ```
 
+
+### Introduction
+
+Parking enforcement plays a critical role in managing urban traffic flow and generating municipal revenue. The City of Los Angeles provides open access to detailed parking citation records through its Open Data Portal.
+This project uses the LA Parking Citation dataset from 2021 to 2025. The dataset includes millions of citation records and provides detailed information such as issue date and time, violation type, fine amount, vehicle make and spatial location (presented using latitude and longitude). The size and richness of this dataset allow varies analysis of parking enforcement patterns in a large metropolitan area.
+
+The research objective of this study is to investigate structural patterns in parking violations over time. Specifically, this project aims to address the following research questions:
+
+1. How did the volume and distribution of parking violations change between 2021 and 2025?
+
+2. Which violation categories contribute the largest share of citations and fines?
+
+3. Are certain vehicle makes or body styles more frequently associated with specific types of violations?
+
+4. Do parking violations exhibit spatial clustering in particular geographic areas of Los Angeles?
+
+The following hypotheses are proposed:
+
+1. A small subset of violation categories accounts for a disproportionately large share of total citations and fine revenue.
+
+2. Parking violation patterns vary over time, potentially reflecting changes in traffic volume and urban activity.
+
+3. Vehicle characteristics (e.g., body style) are associated with differences in violation types.
+
+4. Violations are geographically concentrated in high-density commercial or downtown areas.
+
+By examining these questions, this study aims to better understand the structure of parking enforcement data and uncover systematic patterns in urban parking violations.
+
+---
+
+
+### Methods
+
+#### Data Acquisition
+
+The dataset was obtained from the City of Los Angeles Open Data Portal using the Socrata Open Data API (SODA). Citation records from 2021 to 2025 were retrieved in Python using the requests library. API queries used date based filtering to systematically extract all relevant records. The JSON responses were then converted into tabular format using pandas and stored as structured CSV files for subsequent analysis.
+
+---
+
+#### Data Cleaning and Preprocessing
+
+After data acquisition, an initial variable selection step was performed to keep only relevant fields required for subsequent analysis. The dataset was reduced to the following variablees: ticket identifier, date components (year, month, day), hour, violation code, violation description, fine amount, geographic coordinates (latitude and longitude), vehicle make, registered plate state, and body style. To ensure data integrity, rows containing missing values were removed. This step ensured that all remaining observations contained valid entries across all the selected variables. The proportion of records relative to the original dataset was computed to evaluate the impact of missing-value removal.
+
+---
+
+#### Plausibility Checks
+
+Basic plausibility checks were conducted on key numerical variables. 
+
+##### Temporal validity 
+
+Temporal validity of the dataset was first assessed. The year, month, and day variables were combined to construct a standardized date representation for each record. The minimum and maximum dates were examined to confirm that all observations were within the intended study period. Records containing invalid date values were identified to ensure temporal consistency. In addition, the hour variable was evaluated to verify that all observations were within the standard 24-hour range. Minimum and maximum hour values were examined, and entries outside the permissible interval were identified. This validation process ensureed that invalid time values would not have an impact on daily or across-day temporal analysis.
+
+---
+
+##### Geographic Filtering
+Geographic coordinates were examined to verify that all records corresponded to plausible locations within the Los Angeles region. Predefined latitude and longitude boundaries were established based on the known geographic extent of the study area. Observations outside these bounds were identified as potentially invalid. Spatial filtering was then applied to retain only records falling within the specified geographic window. 
+
+---
+
+##### Fine amount 
+
+The highest fine amounts were reviewed to determine whether extreme values reflected legitimate administrative penalties or possible data entry anomalies. This step ensured that unusually large values were validated.
+The overall distribution of fine amounts was further examined using graphical visualization techniques, including histogram and boxplot analysis. Statistical outliers were identified using the Interquartile Range (IQR) method. The first and third quartiles were calculated, and the IQR was defined as the difference between them. Lower and upper bounds were then established as: Q1−1.5×IQR and Q3+1.5×IQR. Observations falling outside this interval were flagged as statistical outliers. However, extreme values were evaluated in the context of known administrative penalty structures before any exclusion decisions were made. Extreme values consistent with official fine schedules were kept.
+
+---
+
+#### Frequency
+
+Frequency distributions were generated for key categorical variables. This included violation descriptions, vehicle makes, and vehicle body styles.  Absolute counts and relative proportions were computed to identify the most common categories within each variable. These analyses provided a descriptive overview of the composition of citation records prior to the modeling procedures.
+
+---
+
+#### Time Patterns
+
+Citation counts were aggregated at the year–month level and arranged to form a time series representation. The resulting monthly series was prepared for visualization to examine temporal trends in citation volume. Besides, citation counts were also aggregated by hour of the day to identify patterns in violation occurrences across different times. The histogram was generated to visualize the distribution of citations by hour. It provided insights into peak violation periods.
+
+---
+
+### Preliminary Results
+
+#### Dataset Overview and Variable Selection
+
+The initial dataset retrieved from the City of Los Angeles Open Data Portal contains 9,234,940 citation records and 23 variables, with a total memory usage of approximately 1.6 GB. It includes 6 float variables, 2 integer variables, and 15 string variables.
+Following the methodological design, irrelevant variables were removed. After variable selection, no records were removed from the dataset. However, the number of variables was reduced to 13, and the total memory usage decreased to approximately 819 MB. Compared with the original dataset, this variable selection step resulted in nearly a 50% reduction in memory usage.
+
+---
+
+####  Data Cleaning Results
+
+To ensure data integrity across all selected variables, observations containing missing values were removed. The original dataset consisted of 9,234,940 records. After removing rows with missing values, 8,605,218 complete observations remained. This corresponds to a retention rate of 93.18% of the original dataset. Although approximately 6.82% of records were removed, the remaining dataset still contains over 8.6 million observations. Given the large sample size and the relatively small proportion of missing data, listwise deletion was considered appropriate. The high retention rate suggests that the removal of incomplete records is unlikely to introduce significant bias or compromise representativeness.
+
+Table 1. Summary statistics of key numerical variables after listwise deletion.
+
+| Statistic | fine_amount | loc_lat | loc_long |
+|---|---:|---:|---:|
+| Count | 8,605,218 | 8,605,218 | 8,605,218 |
+| Mean | 74.04 | 34.06 | -118.33 |
+| Std | 42.64 | 0.25 | 0.89 |
+| Min | 0.00 | -42.88 | -149.90 |
+| 25% | 63.00 | 34.03 | -118.41 |
+| 50% (Median) | 73.00 | 34.06 | -118.32 |
+| 75% | 73.00 | 34.10 | -118.27 |
+| Max | 1100.00 | 61.22 | 174.70 |
+
+The average fine amount is $74.04, with values ranging from $0 to $1,100. The mean latitude and longitude are 34.06 and −118.33, respectively. This shows that most citations are geographically concentrated within the Los Angeles region.
+
+---
+
+#### Plausibility Checks
+
+##### Temporal Validity
+
+The observed date range spans from January 1, 2021 to December 31, 2025, with no invalid date values. This confirms that all records fall within the intended study period.
+The hour variable was further evaluated to verify compliance with the 24-hour time format. Observed hour values range from 0 to 23, and no records were found outside the permissible interval [0, 23]. These findings indicate temporal variables are valid.
+
+---
+
+##### Geographic Filtering
+
+Geographic coordinates were assessed to ensure that all observations correspond to plausible locations within the Los Angeles region. Based on predefined spatial boundaries (latitude between 33.5 and 34.5, longitude between −119.0 and −117.5), a total of 1,554 records were identified as geographically invalid and removed.
+
+---
+
+#### Fine Amount Distribution and Extreme Values
+
+Fine amounts were examined to assess potential data entry anomalies and distributional characteristics. Observed values range from $0 to $1,100. The highest fine amount ($1,100) appeared multiple times and was consistent with official administrative penalty schedules. It indicated that these values represent legitimate violations rather than data entry errors.
+The mean fine amount is $74.04 and the median is $73.00. It showed a slightly right-skewed distribution. Most fines fall between $63 and $73, reflecting standardized penalty levels for common violations. Based on the IQR method, the statistical lower and upper bounds were estimated at approximately $48 and $88, respectively. Fines falling outside this interval are classified as statistical outliers. The outliers were retained because they correspond to valid administrative penalty categories.
+Figures 1–3 provide visual confirmation of the distributional structure and the presence of extreme but legitimate values.
+
+
 #### Fine amounts
 ```{python}
+#| echo: false
+#| warning: false
+#| message: false
 
-plt.figure(figsize=(10,6))
-sns.histplot(df_complete["fine_amount"], bins=50, kde=True)
-plt.title("Distribution of Fine Amount")
-plt.xlabel("Fine Amount")
-plt.ylabel("Frequency")
-plt.show()
+fig, axes = plt.subplots(2, 1, figsize=(8, 6))
 
-plt.figure(figsize=(10,6))
-sns.histplot(df_complete[df_complete["fine_amount"] <= 200]["fine_amount"], bins=50)
-plt.title("Fine Distribution (Zoomed ≤ 200)")
+sns.histplot(df_complete["fine_amount"], bins=50, kde=True, ax=axes[0])
+axes[0].set_title("Figure 1. Distribution of Fine Amount")
+axes[0].set_xlabel("Fine Amount")
+axes[0].set_ylabel("Frequency")
+
+sns.histplot(
+    df_complete[df_complete["fine_amount"] <= 200]["fine_amount"],
+    bins=50,
+    ax=axes[1]
+)
+axes[1].set_title("Figure 2. Fine Distribution (Zoomed ≤ 200)")
+axes[1].set_xlabel("Fine Amount")
+axes[1].set_ylabel("Frequency")
+
+plt.tight_layout()
 plt.show()
+```
+
+Figure 1. Distribution of fine amounts for all observations.
+The histogram displays the full range of fine amounts. The concentration of values below $200 and a long right tail extending toward $1,100.
+
+Figure 2. Fine amount distribution (zoomed to values ≤ $200).
+The zoomed histogram reveals the dominant concentration of fines between $60 and $80.
+
+```{python}
+#| echo: false
+#| warning: false
+#| message: false
 
 Q1 = df_complete["fine_amount"].quantile(0.25)
 Q3 = df_complete["fine_amount"].quantile(0.75)
@@ -253,34 +425,132 @@ IQR = Q3 - Q1
 lower = Q1 - 1.5 * IQR
 upper = Q3 + 1.5 * IQR
 
-print("Q1:", Q1)
-print("Q3:", Q3)
-print("IQR:", IQR)
-print("Lower bound:", lower)
-print("Upper bound:", upper)
+# print("Q1:", Q1)
+# print("Q3:", Q3)
+# print("IQR:", IQR)
+# print("Lower bound:", lower)
+# print("Upper bound:", upper)
+
+plt.figure(figsize=(8, 3))
+sns.boxplot(x=df_complete[df_complete["fine_amount"] <= 200]["fine_amount"])
+
+plt.axvline(lower, color='red', linestyle='--')
+plt.axvline(upper, color='red', linestyle='--')
+
+plt.title("Figure 3. Boxplot of Fine Amount (≤ 200) with IQR Bounds")
+plt.xlabel("Fine Amount")
+
+plt.tight_layout()
+plt.show()
 ```
+
+Figure 3. Boxplot of fine amounts (≤ $200) with IQR bounds.
+The boxplot illustrates the interquartile range and statistical bounds ($48 and $88). Observations beyond these thresholds are identified as statistical outliers but remain consistent with valid administrative penalty categories.
 
 ### Frequency 
 
 #### Violation Description Distribution
+
+For violation descriptions, citation activity is highly concentrated in a small number of recurring enforcement categories. The most frequent violation, “NO PARK/STREET CLEAN,” accounts for 28% of all citations, followed by “METER EXP.” (15%) and “RED ZONE” (12%). Together, the top three categories represent more than half of all recorded violations, indicating concentrated enforcement patterns.
+
 ```{python}
+#| echo: false
+#| warning: false
+#| message: false
 top_desc = df_complete["violation_description"].value_counts().head(10).to_frame("count")
-top_desc["proportion"] = (top_desc["count"] / len(df_complete)).round(4)
-print(top_desc)
+top_desc["percentage"] = (top_desc["count"] / len(df_complete)).round(4) * 100
+# print(top_desc)
 
+freq_dict = top_desc["count"].to_dict()
+top_desc_sorted = top_desc.sort_values("percentage")
+
+plt.figure(figsize=(8, 3))
+sns.barplot(
+    x=top_desc_sorted["percentage"],
+    y=top_desc_sorted.index,
+    color="steelblue"
+)
+
+plt.xlabel("Percentage of Total Citations (%)")
+plt.ylabel("Violation Description")
+plt.title("Figure 4. Top 10 Violation Categories by Percentage")
+
+for i, v in enumerate(top_desc_sorted["percentage"]):
+    plt.text(v + 0.5, i, f"{v:.1f}%", va='center')
+plt.tight_layout()
+plt.show()
 ```
 
+Figure 4. Top 10 violation categories ranked by proportion of total citations. 
+“NO PARK/STREET CLEAN” accounts for 28% of citations, followed by “METER EXP.” (15%) and “RED ZONE” (12%). The results indicate that enforcement activity is highly concentrated in a small number of recurring violation types.
 
-#### Vehicle Make Distribution
+#### Vehicle Make and Body Style Distribution
+
+Frequency distributions were further examined for vehicle makes and body styles to characterize the structural composition of cited vehicles. Among vehicle makes, Toyota accounts for the largest share of citations, followed by Honda and Ford. In terms of body style, passenger cars dominate the dataset, accounting for the overwhelming majority of citations. Pickup trucks and vans follow at significantly lower proportions.
+Figure 5 presents the distribution of the top vehicle makes and Figure 6 presents the body styles by percentage of total citations.
+
 ```{python}
-print(df_complete["make"].value_counts().head(10))
+#| echo: false
+#| warning: false
+#| message: false
+make_counts = df_complete["make"].value_counts().head(10).to_frame("count")
+make_counts["percentage"] = (make_counts["count"] / len(df_complete)) * 100
+make_counts = make_counts.sort_values("percentage")
+
+body_counts = df_complete["body_style_desc"].value_counts().head(5).to_frame("count")
+body_counts["percentage"] = (body_counts["count"] / len(df_complete)) * 100
+body_counts = body_counts.sort_values("percentage")
+
+fig, axes = plt.subplots(2, 1, figsize=(8, 6))
+
+# Vehicle Make
+sns.barplot(
+    x=make_counts["percentage"],
+    y=make_counts.index,
+    ax=axes[0],
+    color="steelblue"
+)
+axes[0].set_title("Figure 5. Top 10 Vehicle Makes")
+axes[0].set_xlabel("Percentage of Citations (%)")
+axes[0].set_ylabel("")
+
+for i, v in enumerate(make_counts["percentage"]):
+    axes[0].text(v + 0.2, i, f"{v:.1f}%", va='center')
+
+sns.barplot(
+    x=body_counts["percentage"],
+    y=body_counts.index,
+    ax=axes[1],
+    color="darkorange"
+)
+axes[1].set_title("Figure 6. Top 5 Vehicle Body Styles")
+axes[1].set_xlabel("Percentage of Citations (%)")
+axes[1].set_ylabel("")
+
+for i, v in enumerate(body_counts["percentage"]):
+    axes[1].text(v + 0.2, i, f"{v:.1f}%", va='center')
+
+plt.tight_layout()
+plt.show()
 ```
 
-#### Body Style Distribution
-```{python}
-print(df_complete["body_style_desc"].value_counts().head(10))
+Figure 5. Distribution of cited vehicles by make. 
+Toyota, Honda, and Ford represent the most frequently cited vehicle makes, reflecting the prevalence of these brands in urban traffic. 
+Figure 6. Distribution of cited vehicles by body style.
+Passenger cars account for the vast majority of citations, followed by pickup trucks and vans. It shows that enforcement activity is concentrated on personal use vehicles.
 
-```
+
+### Summary
+
+
+
+
+
+
+
+
+
+
 
 ### Time Patterns
 
@@ -332,95 +602,3 @@ plt.show()
 ```{python}
 
 ```
-
-### Introduction
-
-Parking enforcement plays a critical role in managing urban traffic flow and generating municipal revenue. The City of Los Angeles provides open access to detailed parking citation records through its Open Data Portal.
-This project uses the LA Parking Citation dataset from 2021 to 2025. The dataset includes millions of citation records and provides detailed information such as issue date and time, violation type, fine amount, vehicle make and spatial location (presented using latitude and longitude). The size and richness of this dataset allow varies analysis of parking enforcement patterns in a large metropolitan area.
-
-The research objective of this study is to investigate structural patterns in parking violations over time. Specifically, this project aims to address the following research questions:
-
-1. How did the volume and distribution of parking violations change between 2021 and 2025?
-
-2. Which violation categories contribute the largest share of citations and fines?
-
-3. Are certain vehicle makes or body styles more frequently associated with specific types of violations?
-
-4. Do parking violations exhibit spatial clustering in particular geographic areas of Los Angeles?
-
-The following hypotheses are proposed:
-
-1. A small subset of violation categories accounts for a disproportionately large share of total citations and fine revenue.
-
-2. Parking violation patterns vary over time, potentially reflecting changes in traffic volume and urban activity.
-
-3. Vehicle characteristics (e.g., body style) are associated with differences in violation types.
-
-4. Violations are geographically concentrated in high-density commercial or downtown areas.
-
-By examining these questions, this study aims to better understand the structure of parking enforcement data and uncover systematic patterns in urban parking violations.
-
-
-### Methods
-
-#### Data Acquisition
-
-The dataset was obtained from the City of Los Angeles Open Data Portal using the Socrata Open Data API (SODA). Citation records from 2021 to 2025 were retrieved in Python using the requests library. API queries used date based filtering to systematically extract all relevant records. The JSON responses were then converted into tabular format using pandas and stored as structured CSV files for subsequent analysis.
-
-#### Data Cleaning and Preprocessing
-
-After data acquisition, an initial variable selection step was performed to keep only relevant fields required for subsequent analysis. The dataset was reduced to the following variablees: ticket identifier, date components (year, month, day), hour, violation code, violation description, fine amount, geographic coordinates (latitude and longitude), vehicle make, registered plate state, and body style. To ensure data integrity, rows containing missing values were removed. This step ensured that all remaining observations contained valid entries across all the selected variables. The proportion of records relative to the original dataset was computed to evaluate the impact of missing-value removal.
-
-#### Plausibility Checks
-
-Basic plausibility checks were conducted on key numerical variables. 
-
-##### Temporal validity 
-
-Temporal validity of the dataset was first assessed. The year, month, and day variables were combined to construct a standardized date representation for each record. The minimum and maximum dates were examined to confirm that all observations were within the intended study period. Records containing invalid date values were identified to ensure temporal consistency. In addition, the hour variable was evaluated to verify that all observations were within the standard 24-hour range. Minimum and maximum hour values were examined, and entries outside the permissible interval were identified. This validation process ensureed that invalid time values would not have an impact on daily or across-day temporal analysis.
-
-##### Geographic Filtering
-Geographic coordinates were examined to verify that all records corresponded to plausible locations within the Los Angeles region. Predefined latitude and longitude boundaries were established based on the known geographic extent of the study area. Observations outside these bounds were identified as potentially invalid. Spatial filtering was then applied to retain only records falling within the specified geographic window. 
-
-##### Fine amount 
-
-The highest fine amounts were reviewed to determine whether extreme values reflected legitimate administrative penalties or possible data entry anomalies. This step ensured that unusually large values were validated.
-The overall distribution of fine amounts was further examined using graphical visualization techniques, including histogram and boxplot analysis. Statistical outliers were identified using the Interquartile Range (IQR) method. The first and third quartiles were calculated, and the IQR was defined as the difference between them. Lower and upper bounds were then established as: Q1−1.5×IQR and Q3+1.5×IQR. Observations falling outside this interval were flagged as statistical outliers. However, extreme values were evaluated in the context of known administrative penalty structures before any exclusion decisions were made. Extreme values consistent with official fine schedules were kept.
-
-#### Frequency
-
-Frequency distributions were generated for key categorical variables. This included violation descriptions, vehicle makes, and vehicle body styles.  Absolute counts and relative proportions were computed to identify the most common categories within each variable. These analyses provided a descriptive overview of the composition of citation records prior to the modeling procedures.
-
-#### Time Patterns
-
-Citation counts were aggregated at the year–month level and arranged to form a time series representation. The resulting monthly series was prepared for visualization to examine temporal trends in citation volume. Besides, citation counts were also aggregated by hour of the day to identify patterns in violation occurrences across different times. The histogram was generated to visualize the distribution of citations by hour. It provided insights into peak violation periods.
-
-### Preliminary Results
-
-#### Dataset Overview and Variable Selection
-
-The initial dataset retrieved from the City of Los Angeles Open Data Portal contains 9,234,940 citation records and 23 variables, with a total memory usage of approximately 1.6 GB. It includes 6 float variables, 2 integer variables, and 15 string variables.
-Following the methodological design, irrelevant variables were removed. After variable selection, no records were removed from the dataset. However, the number of variables was reduced to 13, and the total memory usage decreased to approximately 819 MB. Compared with the original dataset, this variable selection step resulted in nearly a 50% reduction in memory usage.
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-#### Fine amount 
-The mean fine amount is $74.04, while the median is $73.00. It indicated a right-skewed distribution. The majority of fines fall between $63 and $73, reflecting standardized penalty amount. The IQR-based upper bound was estimated at $88; however, fines exceeding this threshold were retained, as they represent legitimate high-severity violations. The maximum observed fine was $1100.
-
-### Summary
