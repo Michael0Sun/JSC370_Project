@@ -618,7 +618,13 @@ Citation activity is highly concentrated during daytime hours, with peak volumes
 
 This paper examines structural patterns in parking citation data in the city of Los Angeles from 2021 to 2025. With more than 8.6 million clean citation records, several structural patterns have been discovered in parking citation data.
 
-First, te, violation type, or vehicle characteristics. Instead, citation activity exhibits strong structural concentration, temporal fluctuation, and categorical dominance. These results provide a descriptive foundation for future modeling work.
+First, the number of citations follows a temporal pattern. The number of citations per month varies from 120,000 to 180,000. There is a prominent peak in early 2022, followed by a drop to early 2023 and then periodic patterns. These findings confirm the hypothesis that parking citation activity follows a temporal pattern rather than a constant rate. Moreover, hourly aggregation shows a prominent diurnal pattern, where parking citations are predominantly made during working hours, specifically between 8:00 AM and 12:00 PM.
+
+Second, there is a prominent concentration of violation types. A few violation types contribute to a disproportionately large number of total citations. “NO PARK/STREET CLEAN,” “METER EXP.,” and “RED ZONE” alone contribute to more than half of the total citations. This finding strongly supports the hypothesis that a few violation types dominate overall parking citation activity.
+
+Third, vehicle characteristics follow a structural pattern. A few vehicle types, specifically passenger cars, dominate the total number of cited vehicles. Moreover, a few makes, specifically Toyota and Honda, dominate the total number of cited vehicles. This finding strongly supports the hypothesis that parking citation activity is primarily made on a few common personal vehicles rather than specialized vehicles.
+
+In conclusion, the findings of this paper strongly support that parking citation activity in Los Angeles is not randomly distributed in time, violation type, or vehicle characteristics. Rather, parking citation activity strongly follows a structural pattern of concentration, periodicity, and dominance.
 
 #### Plan for Final Project
 
@@ -638,10 +644,4 @@ A web application will be built to display key results and modeling outputs. The
 
 3. Visualization
 
-The final project will feature effective visualization of temporal trends, geographic distributions, and modeling feature importance. Selected visualization components (e.g., year or category filtering) will enable simple user interaction, while preserving interpretability.The number of citations follows a temporal pattern. The number of citations per month varies from 120,000 to 180,000. There is a prominent peak in early 2022, followed by a drop to early 2023 and then periodic patterns. These findings confirm the hypothesis that parking citation activity follows a temporal pattern rather than a constant rate. Moreover, hourly aggregation shows a prominent diurnal pattern, where parking citations are predominantly made during working hours, specifically between 8:00 AM and 12:00 PM.
-
-Second, there is a prominent concentration of violation types. A few violation types contribute to a disproportionately large number of total citations. “NO PARK/STREET CLEAN,” “METER EXP.,” and “RED ZONE” alone contribute to more than half of the total citations. This finding strongly supports the hypothesis that a few violation types dominate overall parking citation activity.
-
-Third, vehicle characteristics follow a structural pattern. A few vehicle types, specifically passenger cars, dominate the total number of cited vehicles. Moreover, a few makes, specifically Toyota and Honda, dominate the total number of cited vehicles. This finding strongly supports the hypothesis that parking citation activity is primarily made on a few common personal vehicles rather than specialized vehicles.
-
-In conclusion, the findings of this paper strongly support that parking citation activity in Los Angeles is not randomly distributed in time.
+The project will include clear visual representations of temporal trends, geographic patterns, and model feature importance. Selected visual elements (e.g., year or category filtering) will allow basic user exploration, while maintaining clarity and interpretability.
