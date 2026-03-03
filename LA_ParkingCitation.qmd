@@ -123,10 +123,10 @@ df.info(show_counts=True)
 
 
 
-## EDA process
+<!-- ## EDA process
 
 
-### Filtering out relevant columns and creating new features
+### Filtering out relevant columns and creating new features -->
 
 ```{python}
 #| echo: false
@@ -149,7 +149,7 @@ df.info(show_counts=True)
 ```
 
 
-### Data Cleaning and Preprocessing
+<!-- ### Data Cleaning and Preprocessing -->
 ```{python}
 #| echo: false
 #| output: false
@@ -177,9 +177,9 @@ df_complete.describe()
 
 
 
-### Plausibility checks
+<!-- ### Plausibility checks
 
-#### Date range
+#### Date range -->
 ```{python}
 #| echo: false
 #| output: false
@@ -192,7 +192,7 @@ print("invalid dates (NaT):", dates.isna().sum())
 
 ```
 
-#### Hour validity
+<!-- #### Hour validity -->
 ```{python}
 #| echo: false
 #| output: false
@@ -206,7 +206,7 @@ print("Rows with invalid hour:", len(invalid_hours))
 ```
 
 
-#### Geographic filtering
+<!-- #### Geographic filtering -->
 ```{python}
 #| echo: false
 #| output: false
@@ -237,7 +237,7 @@ print("Remaining percentage:",
 ```
 
 
-#### Extreme fine values
+<!-- #### Extreme fine values -->
 ```{python}
 #| echo: false
 #| output: false
@@ -447,6 +447,9 @@ plt.show()
 Figure 3. Boxplot of fine amounts (≤ $200) with IQR bounds.
 The boxplot illustrates the interquartile range and statistical bounds ($48 and $88). Observations beyond these thresholds are identified as statistical outliers but remain consistent with valid administrative penalty categories.
 
+---
+
+
 ### Frequency 
 
 #### Violation Description Distribution
@@ -483,6 +486,9 @@ plt.show()
 
 Figure 4. Top 10 violation categories ranked by proportion of total citations. 
 “NO PARK/STREET CLEAN” accounts for 28% of citations, followed by “METER EXP.” (15%) and “RED ZONE” (12%). The results indicate that enforcement activity is highly concentrated in a small number of recurring violation types.
+
+---
+
 
 #### Vehicle Make and Body Style Distribution
 
@@ -539,24 +545,20 @@ Toyota, Honda, and Ford represent the most frequently cited vehicle makes, refle
 Figure 6. Distribution of cited vehicles by body style.
 Passenger cars account for the vast majority of citations, followed by pickup trucks and vans. It shows that enforcement activity is concentrated on personal use vehicles.
 
-
-### Summary
-
-
-
-
-
-
-
-
-
+---
 
 
 ### Time Patterns
 
 
 #### Monthly Citation Pattern
+
+Monthly citation counts were aggregated to examine temporal trends over the study period. Overall, citation activity fluctuates between approximately 120,000 and 180,000 citations per month from the beginning of 2021 to the end of 2025. In 2021, citation volumes remain relatively stable with moderate variation. A noticeable increase occurs in early 2022, reaching a peak of approximately 180,000 citations per month. Following this peak, citation counts decline through late 2022 and reach a local minimum in early 2023. The period from 2023 onward continues to fluctuate substantially, with several short term increases and declines observed throughout 2024 and 2025. While overall volumes generally remain within the broad range of approximately 130,000 to 165,000 citations per month, the repeated peaks and valleys suggest recurring cyclical. Overall, the time series demonstrates alternating periods of expansion and contraction in citation volume.
+
 ```{python}
+#| echo: false
+#| warning: false
+#| message: false
 df_complete["year_month"] = pd.to_datetime(
     df_complete[["year", "month"]].assign(day=1)
 )
@@ -572,10 +574,10 @@ monthly_ts = (
 
 monthly_ts = monthly_ts.iloc[:-1]
 
-plt.figure(figsize=(12,5))
+plt.figure(figsize=(8,3))
 sns.lineplot(data=monthly_ts, x="year_month", y="n_citations")
 
-plt.title("Monthly Parking Citations")
+plt.title("Figure 7. Monthly Parking Citations")
 plt.xlabel("Year-Month")
 plt.ylabel("Number of Citations")
 
@@ -584,21 +586,36 @@ plt.tight_layout()
 plt.show()
 ```
 
+Figure 7. Monthly parking citation counts (2021–2025).
+The series exhibits substantial month to month variation, with a peak in early 2022 and recurring rises and declines in subsequent years.
+
+---
+
+
 #### Citations by Hour
+
+Citation activity remains relatively low during late night and early morning hours (00:00–05:00). A pronounced increase begins around 7:00 AM, with citations peaking during typical daytime enforcement hours. The highest volumes are observed between approximately 8:00 AM and 12:00 PM, with a secondary elevated period extending into early afternoon.
+
+After mid afternoon, citation counts gradually decline, with noticeably lower activity during evening hours (after 7:00 PM). The pattern suggests that enforcement activity is concentrated during standard working hours rather than being evenly distributed throughout the day.
+
 ```{python}
+#| echo: false
+#| warning: false
+#| message: false
+#| 
 hour_counts = df_complete.groupby("hour").size().reset_index(name="n_citations")
 
-plt.figure(figsize=(10,5))
+plt.figure(figsize=(8,3))
 sns.barplot(data=hour_counts, x="hour", y="n_citations")
-plt.title("Citations by Hour")
+plt.title("Figure 8. Citations by Hour")
 plt.show()
 ```
 
+Figure 8. Distribution of parking citations by hour of day.
+Citation activity is highly concentrated during daytime hours, with peak volumes between 8:00 AM and 12:00 PM. Enforcement intensity declines substantially during late night and early morning periods.
 
-```{python}
+---
 
-```
 
-```{python}
+### Summary
 
-```
