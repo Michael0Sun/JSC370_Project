@@ -2218,58 +2218,58 @@ var requirejs,require,define;(function(global,setTimeout){var req,s,head,baseEle
 <!-- #### Extreme fine values -->
 <section id="introduction" class="level3">
 <h3 class="anchored" data-anchor-id="introduction">Introduction</h3>
-<p>Parking enforcement plays a critical role in managing urban traffic flow and generating municipal revenue. The City of Los Angeles provides open access to detailed parking citation records through its Open Data Portal. This project uses the LA Parking Citation dataset from 2021 to 2025. The dataset includes millions of citation records and provides detailed information such as issue date and time, violation type, fine amount, vehicle make and spatial location (presented using latitude and longitude). The size and richness of this dataset allow varies analysis of parking enforcement patterns in a large metropolitan area.</p>
-<p>The research objective of this study is to investigate structural patterns in parking violations over time. Specifically, this project aims to address the following research questions:</p>
+<p>Parking enforcement plays a critical role in managing urban traffic flow and generating municipal revenue. The City of Los Angeles provides open access to detailed parking citation records through its Open Data Portal. The project uses the LA Parking Citation dataset from 2021 to 2025. The dataset contains millions of parking citation records and contains detailed information such as the date and time of issuance, type of violation, amount of fine, make of the vehicle, and geographical location of the violation (which is represented by latitude and longitude coordinates).</p>
+<p>The research objective of this study is to explore structural patterns in parking violations over time. Specifically, this project aims to address the following research questions:</p>
 <ol type="1">
-<li><p>How did the volume and distribution of parking violations change between 2021 and 2025?</p></li>
-<li><p>Which violation categories contribute the largest share of citations and fines?</p></li>
-<li><p>Are certain vehicle makes or body styles more frequently associated with specific types of violations?</p></li>
-<li><p>Do parking violations exhibit spatial clustering in particular geographic areas of Los Angeles?</p></li>
+<li><p>How has the number of parking violations changed in terms of distribution from 2021 to 2025?</p></li>
+<li><p>Which types of violations contribute to the largest number of citations and fines?</p></li>
+<li><p>Are certain vehicle makes or body styles more likely to be linked to certain types of violations?</p></li>
+<li><p>Do parking violations tend to cluster in certain geographic regions of the City of Los Angeles?</p></li>
 </ol>
 <p>The following hypotheses are proposed:</p>
 <ol type="1">
-<li><p>A small subset of violation categories accounts for a disproportionately large share of total citations and fine revenue.</p></li>
+<li><p>A small number of violation types is responsible for a large number of citations and fines.</p></li>
 <li><p>Parking violation patterns vary over time, potentially reflecting changes in traffic volume and urban activity.</p></li>
-<li><p>Vehicle characteristics (e.g., body style) are associated with differences in violation types.</p></li>
-<li><p>Violations are geographically concentrated in high-density commercial or downtown areas.</p></li>
+<li><p>Vehicle characteristics (such as body type) are linked to variations in violation types.</p></li>
+<li><p>Violations tend to be geographically concentrated in high-density commercial or central business districts of Los Angeles.</p></li>
 </ol>
-<p>By examining these questions, this study aims to better understand the structure of parking enforcement data and uncover systematic patterns in urban parking violations.</p>
+<p>Through the exploration of these research questions, this research seeks to gain a deeper understanding of the structure of parking enforcement data and identify systematic patterns of parking violations in urban areas.</p>
 <hr>
 </section>
 <section id="methods" class="level3">
 <h3 class="anchored" data-anchor-id="methods">Methods</h3>
 <section id="data-acquisition" class="level4">
 <h4 class="anchored" data-anchor-id="data-acquisition">Data Acquisition</h4>
-<p>The dataset was obtained from the City of Los Angeles Open Data Portal using the Socrata Open Data API (SODA). Citation records from 2021 to 2025 were retrieved in Python using the requests library. API queries used date based filtering to systematically extract all relevant records. The JSON responses were then converted into tabular format using pandas and stored as structured CSV files for subsequent analysis.</p>
+<p>The data was collected from the Open Data Portal of the City of Los Angeles using the Socrata Open Data API (SODA). The citation records from 2021 to 2025 were fetched in Python using the requests library. The API calls used date-based filtering to systematically fetch all relevant records. The JSON results were then parsed into a tabular format using pandas and saved as structured CSV files for further analysis.</p>
 <hr>
 </section>
 <section id="data-cleaning-and-preprocessing" class="level4">
 <h4 class="anchored" data-anchor-id="data-cleaning-and-preprocessing">Data Cleaning and Preprocessing</h4>
-<p>After data acquisition, an initial variable selection step was performed to keep only relevant fields required for subsequent analysis. The dataset was reduced to the following variables: ticket identifier, date components (year, month, day), hour, violation code, violation description, fine amount, geographic coordinates (latitude and longitude), vehicle make, registered plate state, and body style. To ensure data integrity, rows containing missing values were removed. This step ensured that all remaining observations contained valid entries across all the selected variables. The proportion of records relative to the original dataset was computed to evaluate the impact of missing-value removal.</p>
+<p>After data acquisition, an initial variable selection step was performed to keep only relevant fields required for subsequent analysis. The dataset was filtered to retain the following variables: ticket identifier, date components (year, month, day), hour, violation code, violation description, fine amount, geographic coordinates (latitude and longitude), vehicle make, registered plate state, and body style. To maintain data quality, rows with missing values were deleted. This step ensured that all remaining rows had valid entries for all the selected variables. The percentage of records lost relative to the original dataset was calculated to assess the effect of missing-value deletion.</p>
 <hr>
 </section>
 <section id="plausibility-checks" class="level4">
 <h4 class="anchored" data-anchor-id="plausibility-checks">Plausibility Checks</h4>
-<p>Basic plausibility checks were conducted on key numerical variables.</p>
+<p>Basic plausibility checks were performed on the key numerical variables.</p>
 <section id="temporal-validity" class="level5">
 <h5 class="anchored" data-anchor-id="temporal-validity">Temporal validity</h5>
-<p>Temporal validity of the dataset was first assessed. The year, month, and day variables were combined to construct a standardized date representation for each record. The minimum and maximum dates were examined to confirm that all observations were within the intended study period. Records containing invalid date values were identified to ensure temporal consistency. In addition, the hour variable was evaluated to verify that all observations were within the standard 24-hour range. Minimum and maximum hour values were examined, and entries outside the permissible interval were identified. This validation process ensured that invalid time values would not have an impact on daily or across-day temporal analysis.</p>
+<p>The temporal validity of the dataset was first checked. The year, month, and day variables were combined to form a standardized date format for each record. The minimum and maximum dates were inspected to ensure that all records fell within the scope of the study period. Records with invalid date entries were identified to ensure temporal validity. In addition, the hour variable was inspected to ensure that all records fell within the standard 24-hour range. Minimum and maximum hour values were examined, and entries outside the permissible interval were identified. . This validation step ensured that records with invalid time entries did not affect the analysis of daily and cross daily temporal patterns.</p>
 <hr>
 </section>
 <section id="geographic-filtering" class="level5">
 <h5 class="anchored" data-anchor-id="geographic-filtering">Geographic Filtering</h5>
-<p>Geographic coordinates were examined to verify that all records corresponded to plausible locations within the Los Angeles region. Predefined latitude and longitude boundaries were established based on the known geographic extent of the study area. Observations outside these bounds were identified as potentially invalid. Spatial filtering was then applied to retain only records falling within the specified geographic window.</p>
+<p>The geographic coordinates were analyzed to ensure that extreme data points represented valid administrative penalties or not potentially indicative of data entry errors. A set of predefined latitude and longitude limits was defined based on the known geographic extent of the study area. Data points that fell outside these limits were considered potentially invalid. Geographic filtering was then performed to include only data points that fell within the defined geographic region.</p>
 <hr>
 </section>
 <section id="fine-amount" class="level5">
 <h5 class="anchored" data-anchor-id="fine-amount">Fine amount</h5>
-<p>The highest fine amounts were reviewed to determine whether extreme values reflected legitimate administrative penalties or possible data entry anomalies. This step ensured that unusually large values were validated. The overall distribution of fine amounts was further examined using graphical visualization techniques, including histogram and boxplot analysis. Statistical outliers were identified using the Interquartile Range (IQR) method. The first and third quartiles were calculated, and the IQR was defined as the difference between them. Lower and upper bounds were then established as: Q1−1.5×IQR and Q3+1.5×IQR. Observations falling outside this interval were flagged as statistical outliers. However, extreme values were evaluated in the context of known administrative penalty structures before any exclusion decisions were made. Extreme values consistent with official fine schedules were kept.</p>
+<p>The highest fine amounts were analyzed to ensure that extreme data points represented valid administrative penalties or not potentially indicative of data entry errors. The fine amount distribution was analyzed using graphical visualization methods, including histogram and box plot analysis. Statistical outliers were determined using the Interquartile Range (IQR) method. The first and third quartiles were calculated, and the IQR was defined as their difference. The lower and upper bounds were then defined as: Q1−1.5×IQR and Q3+1.5×IQR. Data points that fell outside this range were considered statistical outliers. However, extreme data points that were consistent with known administrative penalty structures were retained.</p>
 <hr>
 </section>
 </section>
 <section id="frequency" class="level4">
 <h4 class="anchored" data-anchor-id="frequency">Frequency</h4>
-<p>Frequency distributions were generated for key categorical variables. This included violation descriptions, vehicle makes, and vehicle body styles. Absolute counts and relative proportions were computed to identify the most common categories within each variable. These analyses provided a descriptive overview of the composition of citation records prior to the modeling procedures.</p>
+<p>Frequency distributions were created for important categorical variables. These variables included descriptions of violations, vehicle makes, and vehicle body styles. Absolute frequencies and relative proportions were calculated to determine the most frequent categories for each variable. These analyses offered a descriptive summary of the makeup of citation data before the modeling steps.</p>
 <hr>
 </section>
 <section id="time-patterns" class="level4">
@@ -2282,12 +2282,12 @@ var requirejs,require,define;(function(global,setTimeout){var req,s,head,baseEle
 <h3 class="anchored" data-anchor-id="preliminary-results">Preliminary Results</h3>
 <section id="dataset-overview-and-variable-selection" class="level4">
 <h4 class="anchored" data-anchor-id="dataset-overview-and-variable-selection">Dataset Overview and Variable Selection</h4>
-<p>The initial dataset retrieved from the City of Los Angeles Open Data Portal contains 9,234,940 citation records and 23 variables, with a total memory usage of approximately 1.6 GB. It includes 6 float variables, 2 integer variables, and 15 string variables. Following the methodological design, irrelevant variables were removed. After variable selection, no records were removed from the dataset. However, the number of variables was reduced to 13, and the total memory usage decreased to approximately 819 MB. Compared with the original dataset, this variable selection step resulted in nearly a 50% reduction in memory usage.</p>
+<p>The initial dataset retrieved from the City of Los Angeles Open Data Portal contains 9,234,940 citation records and 23 variables, with a total memory usage of about 1.6 GB. It has 6 float variables, 2 integer variables, and 15 string variables. As per the design of the methodology, irrelevant variables are eliminated. After the selection of variables, no records are deleted from the dataset. However, the number of variables is reduced to 13, and the total memory usage is reduced to about 819 MB. Compared to the original dataset, this step of selecting variables has led to a reduction of nearly 50% in the memory usage.</p>
 <hr>
 </section>
 <section id="data-cleaning-results" class="level4">
 <h4 class="anchored" data-anchor-id="data-cleaning-results">Data Cleaning Results</h4>
-<p>To ensure data integrity across all selected variables, observations containing missing values were removed. The original dataset consisted of 9,234,940 records. After removing rows with missing values, 8,605,218 complete observations remained. This corresponds to a retention rate of 93.18% of the original dataset. Although approximately 6.82% of records were removed, the remaining dataset still contains over 8.6 million observations. Given the large sample size and the relatively small proportion of missing data, listwise deletion was considered appropriate. The high retention rate suggests that the removal of incomplete records is unlikely to introduce significant bias or compromise representativeness.</p>
+<p>To ensure data integrity across all selected variables, observations containing missing values were removed. The original dataset had 9,234,940 records. After deleting the records with missing values, 8,605,218 complete observations are left. This corresponds to a retention rate of 93.18% of the original dataset. Although approximately 6.82% of records were removed, the remaining dataset still contains over 8.6 million observations. Due to the large number of records and the small amount of missing data, listwise deletion of data seemed to be a good option. The high retention rate indicates that deleting the incomplete records would not affect the representativeness of the dataset.</p>
 <p>Table 1. Summary statistics of key numerical variables after listwise deletion.</p>
 <table class="caption-top table">
 <thead>
@@ -2356,22 +2356,22 @@ var requirejs,require,define;(function(global,setTimeout){var req,s,head,baseEle
 <h4 class="anchored" data-anchor-id="plausibility-checks-1">Plausibility Checks</h4>
 <section id="temporal-validity-1" class="level5">
 <h5 class="anchored" data-anchor-id="temporal-validity-1">Temporal Validity</h5>
-<p>The observed date range spans from January 1, 2021 to December 31, 2025, with no invalid date values. This confirms that all records fall within the intended study period. The hour variable was further evaluated to verify compliance with the 24-hour time format. Observed hour values range from 0 to 23, and no records were found outside the permissible interval [0, 23]. These findings indicate temporal variables are valid.</p>
+<p>The range of observed dates is from January 1, 2021, to December 31, 2025, without any invalid date entries. This ensures that all records are within the target period of the study. The hour variable was also checked for adherence to the 24-hour clock standard. The observed hour values range from 0 to 23, and no record was found to be outside the valid range of [0, 23]. These results confirm the validity of the temporal variables.</p>
 <hr>
 </section>
 <section id="geographic-filtering-1" class="level5">
 <h5 class="anchored" data-anchor-id="geographic-filtering-1">Geographic Filtering</h5>
-<p>Geographic coordinates were assessed to ensure that all observations correspond to plausible locations within the Los Angeles region. Based on predefined spatial boundaries (latitude between 33.5 and 34.5, longitude between −119.0 and −117.5), a total of 1,554 records were identified as geographically invalid and removed.</p>
+<p>The geographic coordinates of the observations were also checked for their plausibility in terms of being within the Los Angeles region. Using pre-defined spatial constraints (latitude between 33.5 and 34.5, longitude between −119.0 and −117.5), a total of 1,554 records were found to be geographically invalid and hence filtered out.</p>
 <hr>
 </section>
 </section>
 <section id="fine-amount-distribution-and-extreme-values" class="level4">
 <h4 class="anchored" data-anchor-id="fine-amount-distribution-and-extreme-values">Fine Amount Distribution and Extreme Values</h4>
-<p>Fine amounts were examined to assess potential data entry anomalies and distributional characteristics. Observed values range from $0 to $1,100. The highest fine amount ($1,100) appeared multiple times and was consistent with official administrative penalty schedules. It indicated that these values represent legitimate violations rather than data entry errors. The mean fine amount is $74.04 and the median is $73.00. It showed a slightly right-skewed distribution. Most fines fall between $63 and $73, reflecting standardized penalty levels for common violations. Based on the IQR method, the statistical lower and upper bounds were estimated at approximately $48 and $88, respectively. Fines falling outside this interval are classified as statistical outliers. The outliers were retained because they correspond to valid administrative penalty categories. Figures 1–3 provide visual confirmation of the distributional structure and the presence of extreme but legitimate values.</p>
+<p>Fine amount distributions were also checked for any data entry errors and distributional patterns. The observed fine amount values range from $0 to $1,100. The highest fine amount of $1,100 was observed to occur more than once and was in line with official administrative penalty rates. This confirmed that these values are for genuine offenses rather than data entry errors. The mean fine amount is $74.04, and the median is $73.00. This revealed a slightly right-skewed distribution. Most of the fine amounts were between $63 and $73, which reflected standardized penalty amounts for standard offenses. Using the IQR method, the statistical lower and upper limits were approximated to be around $48 and $88, respectively. Amounts outside this range are termed statistical outliers. The outliers were retained since they represented valid administrative penalty amounts. Figures 1–3 above offer graphical evidence of the distributional pattern and the existence of extreme but valid values.</p>
 </section>
 <section id="fine-amounts" class="level4">
 <h4 class="anchored" data-anchor-id="fine-amounts">Fine amounts</h4>
-<div id="ede3c6e1" class="cell" data-message="false" data-execution_count="13">
+<div id="f7471216" class="cell" data-message="false" data-execution_count="13">
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
@@ -2382,7 +2382,7 @@ var requirejs,require,define;(function(global,setTimeout){var req,s,head,baseEle
 </div>
 <p>Figure 1. Distribution of fine amounts for all observations. The histogram displays the full range of fine amounts. The concentration of values below $200 and a long right tail extending toward $1,100.</p>
 <p>Figure 2. Fine amount distribution (zoomed to values ≤ $200). The zoomed histogram reveals the dominant concentration of fines between $60 and $80.</p>
-<div id="120de07e" class="cell" data-message="false" data-execution_count="14">
+<div id="e419333a" class="cell" data-message="false" data-execution_count="14">
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
@@ -2400,7 +2400,7 @@ var requirejs,require,define;(function(global,setTimeout){var req,s,head,baseEle
 <section id="violation-description-distribution" class="level4">
 <h4 class="anchored" data-anchor-id="violation-description-distribution">Violation Description Distribution</h4>
 <p>For violation descriptions, citation activity is highly concentrated in a small number of recurring enforcement categories. The most frequent violation, “NO PARK/STREET CLEAN,” accounts for 28% of all citations, followed by “METER EXP.” (15%) and “RED ZONE” (12%). Together, the top three categories represent more than half of all recorded violations, indicating concentrated enforcement patterns.</p>
-<div id="2f18fdec" class="cell" data-message="false" data-execution_count="15">
+<div id="55dcc424" class="cell" data-message="false" data-execution_count="15">
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
@@ -2415,7 +2415,7 @@ var requirejs,require,define;(function(global,setTimeout){var req,s,head,baseEle
 <section id="vehicle-make-and-body-style-distribution" class="level4">
 <h4 class="anchored" data-anchor-id="vehicle-make-and-body-style-distribution">Vehicle Make and Body Style Distribution</h4>
 <p>Frequency distributions were further examined for vehicle makes and body styles to characterize the structural composition of cited vehicles. Among vehicle makes, Toyota accounts for the largest share of citations, followed by Honda and Ford. In terms of body style, passenger cars dominate the dataset, accounting for the overwhelming majority of citations. Pickup trucks and vans follow at significantly lower proportions. Figure 5 presents the distribution of the top vehicle makes and Figure 6 presents the body styles by percentage of total citations.</p>
-<div id="52aecc9b" class="cell" data-message="false" data-execution_count="16">
+<div id="400f3080" class="cell" data-message="false" data-execution_count="16">
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
@@ -2433,7 +2433,7 @@ var requirejs,require,define;(function(global,setTimeout){var req,s,head,baseEle
 <section id="monthly-citation-pattern" class="level4">
 <h4 class="anchored" data-anchor-id="monthly-citation-pattern">Monthly Citation Pattern</h4>
 <p>Monthly citation counts were aggregated to examine temporal trends over the study period. Overall, citation activity fluctuates between approximately 120,000 and 180,000 citations per month from the beginning of 2021 to the end of 2025. In 2021, citation volumes remain relatively stable with moderate variation. A noticeable increase occurs in early 2022, reaching a peak of approximately 180,000 citations per month. Following this peak, citation counts decline through late 2022 and reach a local minimum in early 2023. The period from 2023 onward continues to fluctuate substantially, with several short term increases and declines observed throughout 2024 and 2025. While overall volumes generally remain within the broad range of approximately 130,000 to 165,000 citations per month, the repeated peaks and valleys suggest recurring cyclical. Overall, the time series demonstrates alternating periods of expansion and contraction in citation volume.</p>
-<div id="62bec512" class="cell" data-message="false" data-execution_count="17">
+<div id="32e98d73" class="cell" data-message="false" data-execution_count="17">
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
@@ -2449,7 +2449,7 @@ var requirejs,require,define;(function(global,setTimeout){var req,s,head,baseEle
 <h4 class="anchored" data-anchor-id="citations-by-hour">Citations by Hour</h4>
 <p>Citation activity remains relatively low during late night and early morning hours (00:00–05:00). A pronounced increase begins around 7:00 AM, with citations peaking during typical daytime enforcement hours. The highest volumes are observed between approximately 8:00 AM and 12:00 PM, with a secondary elevated period extending into early afternoon.</p>
 <p>After mid afternoon, citation counts gradually decline, with noticeably lower activity during evening hours (after 7:00 PM). The pattern suggests that enforcement activity is concentrated during standard working hours rather than being evenly distributed throughout the day.</p>
-<div id="9c33e632" class="cell" data-message="false" data-execution_count="18">
+<div id="17c19b3b" class="cell" data-message="false" data-execution_count="18">
 <div class="cell-output cell-output-display">
 <div>
 <figure class="figure">
@@ -2464,11 +2464,8 @@ var requirejs,require,define;(function(global,setTimeout){var req,s,head,baseEle
 </section>
 <section id="summary" class="level3">
 <h3 class="anchored" data-anchor-id="summary">Summary</h3>
-<p>This study investigated structural patterns in parking enforcement data from Los Angeles between 2021 and 2025. Using over 8.6 million cleaned citation records, several systematic patterns were identified across violation types, vehicle characteristics, temporal dynamics, and spatial validity.</p>
-<p>First, citation volume exhibits clear temporal variation. Monthly citation counts fluctuate between approximately 120,000 and 180,000 citations. A noticeable peak occurs in early 2022, followed by a decline into early 2023 and continued cyclical variation thereafter. These results support the hypothesis that parking enforcement activity varies over time rather than remaining constant. Additionally, hourly aggregation reveals a strong diurnal pattern, with enforcement concentrated during daytime working hours, particularly between 8:00 AM and 12:00 PM.</p>
-<p>Second, violation categories are highly concentrated. A small subset of recurring violations accounts for a disproportionately large share of total citations. “NO PARK/STREET CLEAN,” “METER EXP.,” and “RED ZONE” together represent more than half of all recorded citations. This finding strongly supports the hypothesis that a limited number of violation types dominate overall enforcement activity.</p>
-<p>Third, vehicle characteristics display structural concentration. Passenger cars account for the overwhelming majority of cited vehicles, and a small number of makes—particularly Toyota and Honda—appear most frequently. This suggests that enforcement activity primarily involves common personal-use vehicles rather than specialized or commercial vehicle types. While this does not establish causal associations between vehicle type and violation behavior, it confirms that citation records are structurally concentrated among prevalent urban vehicle categories.</p>
-<p>Overall, the findings reveal that parking enforcement in Los Angeles is not randomly distributed across time, violation categories, or vehicle characteristics. Instead, citation activity exhibits strong structural concentration, temporal fluctuation, and categorical dominance. These results provide a descriptive foundation for future modeling work.</p>
+<p>This paper examines structural patterns in parking citation data in the city of Los Angeles from 2021 to 2025. With more than 8.6 million clean citation records, several structural patterns have been discovered in parking citation data.</p>
+<p>First, te, violation type, or vehicle characteristics. Instead, citation activity exhibits strong structural concentration, temporal fluctuation, and categorical dominance. These results provide a descriptive foundation for future modeling work.</p>
 <section id="plan-for-final-project" class="level4">
 <h4 class="anchored" data-anchor-id="plan-for-final-project">Plan for Final Project</h4>
 <ol type="1">
@@ -2476,16 +2473,19 @@ var requirejs,require,define;(function(global,setTimeout){var req,s,head,baseEle
 </ol>
 <p>The primary objective is to model fine amounts and citation patterns.</p>
 <p>Feature engineering will include temporal variables (month, hour), encoded violation types and vehicle characteristics, and basic spatial features derived from latitude and longitude.</p>
-<p>Tree-based regression models will be implemented to predict fine amounts and evaluate feature importance. Model performance will be assessed using cross validation and metrics such as RMSE.</p>
-<p>In addition, a time-series component will be explored to model monthly citation trends and examine seasonal patterns. A Generalized Additive Model (GAM) may also be used to capture nonlinear effects of time and location in an interpretable manner.</p>
+<p>Tree-based regression models will be applied to model fine amounts and rank feature importance. Model evaluation will be done using cross-validation and metrics such as RMSE.</p>
+<p>In addition, a time series aspect will be considered to model monthly citation data and explore seasonal behavior. A Generalized Additive Model (GAM) can also be applied to model nonlinear relationships between time and location in an interpretable way.</p>
 <ol start="2" type="1">
 <li>Website Development</li>
 </ol>
-<p>A web-based dashboard will be developed to present key findings and model outputs. The system will include summary statistics, time-series trends, and model prediction results.</p>
+<p>A web application will be built to display key results and modeling outputs. The application will feature summary statistics, time series plots, and modeling prediction results.</p>
 <ol start="3" type="1">
 <li>Visualization</li>
 </ol>
-<p>The project will include clear visual representations of temporal trends, geographic patterns, and model feature importance. Selected visual elements (e.g., year or category filtering) will allow basic user exploration, while maintaining clarity and interpretability.</p>
+<p>The final project will feature effective visualization of temporal trends, geographic distributions, and modeling feature importance. Selected visualization components (e.g., year or category filtering) will enable simple user interaction, while preserving interpretability.he number of citations follows a temporal pattern. The number of citations per month varies from 120,000 to 180,000. There is a prominent peak in early 2022, followed by a drop to early 2023 and then periodic patterns. These findings confirm the hypothesis that parking citation activity follows a temporal pattern rather than a constant rate. Moreover, hourly aggregation shows a prominent diurnal pattern, where parking citations are predominantly made during working hours, specifically between 8:00 AM and 12:00 PM.</p>
+<p>Second, there is a prominent concentration of violation types. A few violation types contribute to a disproportionately large number of total citations. “NO PARK/STREET CLEAN,” “METER EXP.,” and “RED ZONE” alone contribute to more than half of the total citations. This finding strongly supports the hypothesis that a few violation types dominate overall parking citation activity.</p>
+<p>Third, vehicle characteristics follow a structural pattern. A few vehicle types, specifically passenger cars, dominate the total number of cited vehicles. Moreover, a few makes, specifically Toyota and Honda, dominate the total number of cited vehicles. This finding strongly supports the hypothesis that parking citation activity is primarily made on a few common personal vehicles rather than specialized vehicles.</p>
+<p>In conclusion, the findings of this paper strongly support that parking citation activity in Los Angeles is not randomly distributed in tim</p>
 </section>
 </section>
 
