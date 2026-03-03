@@ -7,10 +7,6 @@ jupyter: python3
 ---
 
 
-
-### Introduction
-
-
 ```{python}
 #| echo: false
 #| output: false
@@ -291,7 +287,7 @@ The dataset was obtained from the City of Los Angeles Open Data Portal using the
 
 #### Data Cleaning and Preprocessing
 
-After data acquisition, an initial variable selection step was performed to keep only relevant fields required for subsequent analysis. The dataset was reduced to the following variablees: ticket identifier, date components (year, month, day), hour, violation code, violation description, fine amount, geographic coordinates (latitude and longitude), vehicle make, registered plate state, and body style. To ensure data integrity, rows containing missing values were removed. This step ensured that all remaining observations contained valid entries across all the selected variables. The proportion of records relative to the original dataset was computed to evaluate the impact of missing-value removal.
+After data acquisition, an initial variable selection step was performed to keep only relevant fields required for subsequent analysis. The dataset was reduced to the following variables: ticket identifier, date components (year, month, day), hour, violation code, violation description, fine amount, geographic coordinates (latitude and longitude), vehicle make, registered plate state, and body style. To ensure data integrity, rows containing missing values were removed. This step ensured that all remaining observations contained valid entries across all the selected variables. The proportion of records relative to the original dataset was computed to evaluate the impact of missing-value removal.
 
 ---
 
@@ -301,7 +297,7 @@ Basic plausibility checks were conducted on key numerical variables.
 
 ##### Temporal validity 
 
-Temporal validity of the dataset was first assessed. The year, month, and day variables were combined to construct a standardized date representation for each record. The minimum and maximum dates were examined to confirm that all observations were within the intended study period. Records containing invalid date values were identified to ensure temporal consistency. In addition, the hour variable was evaluated to verify that all observations were within the standard 24-hour range. Minimum and maximum hour values were examined, and entries outside the permissible interval were identified. This validation process ensureed that invalid time values would not have an impact on daily or across-day temporal analysis.
+Temporal validity of the dataset was first assessed. The year, month, and day variables were combined to construct a standardized date representation for each record. The minimum and maximum dates were examined to confirm that all observations were within the intended study period. Records containing invalid date values were identified to ensure temporal consistency. In addition, the hour variable was evaluated to verify that all observations were within the standard 24-hour range. Minimum and maximum hour values were examined, and entries outside the permissible interval were identified. This validation process ensured that invalid time values would not have an impact on daily or across-day temporal analysis.
 
 ---
 
@@ -619,3 +615,32 @@ Citation activity is highly concentrated during daytime hours, with peak volumes
 
 ### Summary
 
+This study investigated structural patterns in parking enforcement data from Los Angeles between 2021 and 2025. Using over 8.6 million cleaned citation records, several systematic patterns were identified across violation types, vehicle characteristics, temporal dynamics, and spatial validity.
+
+First, citation volume exhibits clear temporal variation. Monthly citation counts fluctuate between approximately 120,000 and 180,000 citations. A noticeable peak occurs in early 2022, followed by a decline into early 2023 and continued cyclical variation thereafter. These results support the hypothesis that parking enforcement activity varies over time rather than remaining constant. Additionally, hourly aggregation reveals a strong diurnal pattern, with enforcement concentrated during daytime working hours, particularly between 8:00 AM and 12:00 PM.
+
+Second, violation categories are highly concentrated. A small subset of recurring violations accounts for a disproportionately large share of total citations. “NO PARK/STREET CLEAN,” “METER EXP.,” and “RED ZONE” together represent more than half of all recorded citations. This finding strongly supports the hypothesis that a limited number of violation types dominate overall enforcement activity.
+
+Third, vehicle characteristics display structural concentration. Passenger cars account for the overwhelming majority of cited vehicles, and a small number of makes—particularly Toyota and Honda—appear most frequently. This suggests that enforcement activity primarily involves common personal-use vehicles rather than specialized or commercial vehicle types. While this does not establish causal associations between vehicle type and violation behavior, it confirms that citation records are structurally concentrated among prevalent urban vehicle categories.
+
+Overall, the findings reveal that parking enforcement in Los Angeles is not randomly distributed across time, violation categories, or vehicle characteristics. Instead, citation activity exhibits strong structural concentration, temporal fluctuation, and categorical dominance. These results provide a descriptive foundation for future modeling work.
+
+#### Plan for Final Project
+
+1. Machine Learning Modeling
+
+The primary objective is to model fine amounts and citation patterns.
+
+Feature engineering will include temporal variables (month, hour), encoded violation types and vehicle characteristics, and basic spatial features derived from latitude and longitude.
+
+Tree-based regression models will be implemented to predict fine amounts and evaluate feature importance. Model performance will be assessed using cross validation and metrics such as RMSE.
+
+In addition, a time-series component will be explored to model monthly citation trends and examine seasonal patterns. A Generalized Additive Model (GAM) may also be used to capture nonlinear effects of time and location in an interpretable manner.
+
+2. Website Development
+
+A web-based dashboard will be developed to present key findings and model outputs. The system will include summary statistics, time-series trends, and model prediction results. 
+
+3. Visualization
+
+The project will include clear visual representations of temporal trends, geographic patterns, and model feature importance. Selected visual elements (e.g., year or category filtering) will allow basic user exploration, while maintaining clarity and interpretability.
