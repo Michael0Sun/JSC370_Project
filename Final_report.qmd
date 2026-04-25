@@ -1,0 +1,1260 @@
+---
+title: "Analysis of Parking Violations in Los Angeles (2021–2025)"
+format:
+  pdf:
+    toc: false
+    number-sections: true
+    colorlinks: true
+    title-block-style: plain
+---
+
+```{python}
+#| echo: false
+#| output: false
+import requests
+import pandas as pd
+import numpy as np
+import time
+import os
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+import glob
+import matplotlib.pyplot as plt
+import seaborn as sns
+import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+
+
+from sklearn.preprocessing import LabelEncoder
+from sklearn.model_selection import train_test_split
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.metrics import accuracy_score, classification_report, f1_score
+from sklearn.tree import plot_tree
+
+from xgboost import XGBClassifier
+from sklearn.metrics import accuracy_score, f1_score, classification_report, confusion_matrix, ConfusionMatrixDisplay, mean_squared_error, mean_absolute_error, r2_score
+from sklearn.utils.class_weight import compute_sample_weight
+
+from pygam import PoissonGAM, s, f
+
+from scipy.stats import chi2_contingency
+# APP_TOKEN = os.getenv("SOCRATA_APP_TOKEN")
+
+# url = "https://data.lacity.org/resource/4f5p-udkv.json"
+
+# headers = {
+#     "X-App-Token": APP_TOKEN
+# }
+
+
+# years = [2021, 2022, 2023, 2024, 2025]
+# limit = 50000
+
+# for year in years:
+    
+#     print(f"\nFetching {year} data...")
+    
+#     all_data = []
+#     offset = 0
+    
+#     while True:
+        
+#         params = {
+#             "$select": "ticket_number, issue_date, issue_time, violation_code, violation_description, fine_amount, loc_lat, loc_long, make, body_style_desc",
+#             "$where": f"issue_date >= '{year}-01-01T00:00:00.000' AND issue_date < '{year+1}-01-01T00:00:00.000'",
+#             "$limit": limit,
+#             "$offset": offset
+#         }
+        
+#         response = requests.get(url, headers=headers, params=params)
+        
+#         if response.status_code != 200:
+#             print("Error:", response.status_code)
+#             break
+        
+#         data = response.json()
+        
+#         if not data:
+#             break
+        
+#         all_data.extend(data)
+#         print(f"Year {year}: fetched {len(all_data)} rows")
+        
+#         offset += limit
+    
+#     df = pd.DataFrame(all_data)
+    
+#     df.to_csv(f"la_parking_{year}.csv", index=False)
+    
+#     print(f"{year} complete. Saved {len(df)} rows.")
+```
+
+
+```{python}
+#| echo: false
+#| output: false
+
+data_dir = "Data"
+
+file_paths = glob.glob(os.path.join(data_dir, "la_parking_*.csv"))
+print("Files found:", file_paths)
+
+df_list = []
+
+for file in file_paths:
+    
+    df_temp = pd.read_csv(file)
+    filename = os.path.basename(file) 
+    year = filename.split("_")[-1].replace(".csv", "")
+    df_temp["year"] = int(year)
+    df_list.append(df_temp)
+
+df = pd.concat(df_list, ignore_index=True)
+
+print("Final shape:", df.shape)
+df.head()
+
+```
+
+```{python}
+#| echo: false
+#| output: false
+
+pd.set_option("display.float_format", "{:.2f}".format)
+df.describe()
+```
+
+```{python}
+#| echo: false
+#| output: false
+df.info(show_counts=True)
+```
+
+
+
+
+<!-- ## EDA process
+
+
+### Filtering out relevant columns and creating new features -->
+
+```{python}
+#| echo: false
+#| output: false
+df["issue_date"] = pd.to_datetime(df["issue_date"])
+df["year"] = df["issue_date"].dt.year
+df["month"] = df["issue_date"].dt.month
+df["day"] = df["issue_date"].dt.day
+df["issue_time"] = pd.to_numeric(df["issue_time"], errors="coerce")
+df["hour"] = (df["issue_time"] // 100).astype("Int64")
+df.drop(columns=["route","meter_id","marked_time"], inplace=True)
+```
+
+
+```{python}
+#| echo: false
+#| output: false
+df = df[["ticket_number", "year", "month", "day", "hour", "violation_code", "violation_description", "fine_amount", "loc_lat", "loc_long", "make", "rp_state_plate","body_style_desc"]]
+df.info(show_counts=True)
+```
+
+
+<!-- ### Data Cleaning and Preprocessing -->
+```{python}
+#| echo: false
+#| output: false
+
+df_complete = df.dropna()
+
+print("Original rows:", df.shape[0])
+print("Remaining rows after dropna():", df_complete.shape[0])
+
+remaining_ratio = df_complete.shape[0] / df.shape[0]
+
+print("Remaining percentage:", round(remaining_ratio * 100, 2), "%")
+
+missing_counts = df.isna().sum().sort_values(ascending=False)
+missing_percent = (df.isna().mean() * 100).sort_values(ascending=False)
+
+missing_summary = pd.DataFrame({
+    "missing_count": missing_counts,
+    "missing_percent": missing_percent
+})
+
+missing_summary[missing_summary["missing_count"] > 0]
+
+df_missing = df[df.isna().any(axis=1)]
+df_nonmissing = df.dropna()
+
+missing_violation_dist = df_missing["violation_description"].value_counts(normalize=True).head(10)
+overall_violation_dist = df["violation_description"].value_counts(normalize=True).head(10)
+
+print(missing_violation_dist)
+print(overall_violation_dist)
+
+
+```
+
+```{python}
+#| echo: false
+#| output: false
+
+df_complete.info(show_counts=True)
+df_complete.shape
+df_complete.dtypes
+df_complete.describe()
+```
+
+
+
+<!-- ### Plausibility checks
+
+#### Date range -->
+```{python}
+#| echo: false
+#| output: false
+
+dates = pd.to_datetime(df[["year","month","day"]], errors="coerce")
+
+print("date min:", dates.min())
+print("date max:", dates.max())
+print("invalid dates (NaT):", dates.isna().sum())
+
+```
+
+<!-- #### Hour validity -->
+```{python}
+#| echo: false
+#| output: false
+
+print("Hour min:", df_complete["hour"].min())
+print("Hour max:", df_complete["hour"].max())
+
+invalid_hours = df_complete[(df_complete["hour"] < 0) | (df_complete["hour"] > 23)]
+print("Rows with invalid hour:", len(invalid_hours))
+
+```
+
+
+<!-- #### Geographic filtering -->
+```{python}
+#| echo: false
+#| output: false
+
+
+lat_min, lat_max = 33.5, 34.5
+lon_min, lon_max = -119.0, -117.5
+
+invalid_geo = df_complete[
+    (df_complete["loc_lat"] < lat_min) |
+    (df_complete["loc_lat"] > lat_max) |
+    (df_complete["loc_long"] < lon_min) |
+    (df_complete["loc_long"] > lon_max)
+]
+
+print("Invalid geographic rows:", len(invalid_geo))
+
+
+df_complete = df_complete[
+    (df_complete["loc_lat"].between(lat_min, lat_max)) &
+    (df_complete["loc_long"].between(lon_min, lon_max))
+].copy()
+
+print("Rows after geographic filtering:", len(df_complete))
+print("Remaining percentage:",
+      round(len(df_complete) / df.shape[0] * 100, 2), "%")
+
+```
+
+
+<!-- #### Extreme fine values -->
+```{python}
+#| echo: false
+#| output: false
+
+print("Fine min:", df_complete["fine_amount"].min())
+print("Fine max:", df_complete["fine_amount"].max())
+
+top10_fines = df_complete["fine_amount"].sort_values(ascending=False).head(10)
+print(top10_fines)
+
+```
+
+
+### Introduction
+
+Parking enforcement plays a critical role in managing urban traffic flow and generating municipal revenue. The City of Los Angeles provides open access to detailed parking citation records through its Open Data Portal.
+This analysis uses the LA Parking Citation dataset from 2021 to 2025. The dataset contains millions of parking citation records and detailed information such as the date and time of issuance, type of violation, amount of fine, make of the vehicle, and geographical location of the violation represented by latitude and longitude coordinates.
+
+The research objective of this study is to explore structural patterns in parking violations over time. Specifically, this project aims to address the following research questions:
+
+1. Are certain vehicle makes or body styles more likely to be linked to certain types of violations?
+2. How has the number of parking violations changed from 2021 to 2025?
+3. Do parking violations tend to cluster in certain geographic regions of the City of Los Angeles?
+4. To what extent can parking violation types be predicted using temporal, vehicle, and spatial features?
+
+Through the exploration of these research questions, this research seeks to help improve urban traffic management and give a better understanding of driver behavior in dense metropolitan areas.
+
+### Methods
+
+#### Data Preparation and Cleaning
+
+The data are obtained from the City of Los Angeles Open Data Portal via the Socrata API. Key variables are selected based on relevance to the research questions. Subsequently, records with missing values are removed using listwise deletion to ensure data consistency. In addition, a series of basic plausibility checks are performed on the variables. Dates are constructed from year, month, and day fields, and the hour variable is verified to fall within the 24-hour range. Geographic coordinates are filtered using predefined latitude and longitude bounds corresponding to the Los Angeles region to remove implausible observations.
+
+#### Exploratory Data Analysis Methods
+
+Exploratory data analysis is conducted to summarize key patterns in the dataset. Histograms and boxplots are used to examine the distribution of fine amounts and identify potential outliers using the IQR method. Temporal patterns are analyzed by aggregating citation counts at the year–month level to construct a time series, and by hour of the day to examine daily variation in enforcement activity.
+
+#### Statistical Analysis
+
+A chi-square test of independence is conducted to evaluate the relationship between vehicle body type and violation type. A contingency table is constructed using observed frequencies across categories. The chi-square statistic and p-value are used to assess statistical significance. To quantify the strength of the association, Cramer’s V is calculated as an effective size measure, providing an independent scale assessment of the practical relationship between the variables.
+
+#### Geographic Analysis
+
+Spatial patterns in parking violations are analyzed using latitude and longitude coordinates. Geographic data are separated into grid-based spatial bins, and citation counts are aggregated within each grid cell. Spatial visualization techniques are applied to identify areas with high concentrations of violations and to assess potential clustering in urban regions.
+
+#### Predictive Modeling and Model Evaluation
+
+To address the predictive research question, classification models are developed to predict violation types based on temporal, vehicle, and spatial features. A Decision Tree classifier is used as a baseline model, providing interpretability through recursive partitioning. An XGBoost classifier is then applied to build an ensemble of decision trees using gradient boosting to improve predictive performance.
+
+The dataset is split into training, validation, and test sets using stratified sampling (60% training, 20% validation, 20% testing). The validation set is used for hyperparameter tuning. For the Decision Tree, tuned hyperparameters include maximum tree depth, minimum samples required for a split, minimum samples per leaf, and the cost-complexity pruning parameter. For XGBoost, tuned hyperparameters include learning rate, maximum tree depth, subsampling ratio, and the number of boosting trees.
+
+Model performance is evaluated on the test set using accuracy and macro-averaged F1-score. These metrics assess overall predictive accuracy and balanced performance across all violation categories.
+
+### Result
+
+#### Data Summary
+
+The initial dataset retrieved from the City of Los Angeles Open Data Portal contains 9,234,940 citation records and 23 variables, with a total memory usage of about 1.6 GB. After selecting relevant variables, the dataset is reduced to 13 variables and approximately 819 MB, resulting in a nearly 50% reduction in memory usage.
+To ensure data integrity, observations containing missing values are removed using listwise deletion. The dataset is reduced to 8,605,218 complete observations, corresponding to a retention rate of 93.18%. Although a small proportion of data is removed, the resulting dataset remains sufficiently large for analysis.
+The average fine amount is $74.04, with values ranging from $0 to $1,100. The mean latitude and longitude are 34.06 and −118.33, respectively, indicating that most citations are geographically concentrated within the Los Angeles region.
+Fine amount distributions are examined to understand the overall structure of penalty values. The distribution is slightly right-skewed, with most observations concentrated within a narrow range.
+
+```{python}
+#| echo: false
+#| warning: false
+#| message: false
+#| eval: false
+
+fig, axes = plt.subplots(2, 1, figsize=(8, 4))
+
+sns.histplot(df_complete["fine_amount"], bins=50, kde=True, ax=axes[0])
+
+axes[0].set_xlabel("Fine Amount")
+axes[0].set_ylabel("Frequency")
+
+sns.histplot(
+    df_complete[df_complete["fine_amount"] <= 200]["fine_amount"],
+    bins=50,
+    ax=axes[1]
+)
+
+axes[1].set_xlabel("Fine Amount")
+axes[1].set_ylabel("Frequency")
+
+
+plt.tight_layout()
+plt.savefig("outputs/fine_distribution.png", dpi=120, bbox_inches="tight")
+plt.show()
+```
+
+![Fine amount distributions It shows both the overall distribution and the zoomed distribution below $200. The dominant concentration is between $60 and $80.](outputs/fine_distribution.png){#fig-fine-distribution fig-pos="H"}
+
+
+```{python}
+#| echo: false
+#| warning: false
+#| message: false
+
+Q1 = df_complete["fine_amount"].quantile(0.25)
+Q3 = df_complete["fine_amount"].quantile(0.75)
+IQR = Q3 - Q1
+
+lower = Q1 - 1.5 * IQR
+upper = Q3 + 1.5 * IQR
+
+# print("Q1:", Q1)
+# print("Q3:", Q3)
+# print("IQR:", IQR)
+# print("Lower bound:", lower)
+# print("Upper bound:", upper)
+```
+
+```{python}
+#| echo: false
+#| warning: false
+#| message: false
+#| eval: false
+
+plt.figure(figsize=(8, 2))
+sns.boxplot(x=df_complete[df_complete["fine_amount"] <= 200]["fine_amount"])
+
+plt.axvline(lower, color='red', linestyle='--')
+plt.axvline(upper, color='red', linestyle='--')
+
+
+plt.xlabel("Fine Amount")
+
+plt.tight_layout()
+plt.savefig("outputs/boxplot.png", dpi=120, bbox_inches="tight")
+plt.show()
+```
+
+![Boxplot of Fine Amount (<=200) with IQR Bounds It illustrates the interquartile range and the presence of higher value observation](outputs/boxplot.png){#fig-boxplot fig-pos="H"}
+
+
+```{python}
+#| echo: false
+#| warning: false
+#| message: false
+#| output: false
+top_k = 5
+
+top_classes = (
+    df_complete["violation_description"]
+    .value_counts()
+    .nlargest(top_k)
+    .index
+)
+
+df_model = df_complete.copy()
+
+df_model["violation_group"] = df_model["violation_description"].where(
+    df_model["violation_description"].isin(top_classes),
+    "OTHER"
+)
+
+dist = df_model["violation_group"].value_counts(normalize=True)
+
+print(dist)
+```
+
+
+```{python}
+#| echo: false
+#| warning: false
+#| message: false
+#| output: false
+def haversine_km(lat1, lon1, lat2, lon2):
+
+    R = 6371
+    dlat = np.radians(lat2 - lat1)
+    dlon = np.radians(lon2 - lon1)
+    a = (
+        np.sin(dlat/2)**2
+        + np.cos(np.radians(lat1))*np.cos(np.radians(lat2))*np.sin(dlon/2)**2
+    )
+    return R * 2 * np.arcsin(np.sqrt(a))
+
+LAT0, LON0 = 34.0522, -118.2437
+
+df_model["dist_downtown"] = haversine_km(
+    df_model["loc_lat"],
+    df_model["loc_long"],
+    LAT0,
+    LON0
+)
+```
+
+
+```{python}
+#| echo: false
+#| warning: false
+#| message: false
+#| output: false
+top_make = df_model["make"].value_counts().nlargest(10).index
+
+df_model["make_group"] = df_model["make"].where(
+    df_model["make"].isin(top_make),
+    "OTHER"
+)
+
+```
+
+
+```{python}
+#| echo: false
+#| warning: false
+#| message: false
+#| output: false
+
+
+df_model["is_CA"] = (df_model["rp_state_plate"] == "CA").astype(int)
+```
+
+
+```{python}
+#| echo: false
+#| warning: false
+#| message: false
+#| output: false
+def map_body(x):
+    if "PASSENGER" in x:
+        return "CAR"
+    elif "TRUCK" in x:
+        return "TRUCK"
+    elif "SUV" in x:
+        return "SUV"
+    elif "VAN" in x:
+        return "VAN"
+    else:
+        return "OTHER"
+
+df_model["body_group"] = df_model["body_style_desc"].apply(map_body)
+```
+
+
+```{python}
+#| echo: false
+#| warning: false
+#| message: false
+#| output: false
+base_cols = [
+    "month",
+    "day",
+    "hour",
+    "loc_lat",
+    "loc_long",
+    "dist_downtown",
+    "is_CA",
+    "make_group",
+    "body_group",
+    "violation_group"
+]
+
+df_model_encoded = df_model[base_cols].copy()
+
+cat_cols = ["make_group", "body_group"]
+
+df_model_encoded = pd.get_dummies(
+    df_model_encoded,
+    columns=cat_cols,
+    drop_first=True,
+    dtype="int8"
+)
+
+le = LabelEncoder()
+df_model_encoded["target"] = le.fit_transform(df_model_encoded["violation_group"])
+
+
+feature_cols = [
+    "month",
+    "day",
+    "hour",
+    "loc_lat",
+    "loc_long",
+    "dist_downtown",
+    "is_CA"
+]
+
+dummy_cols = [
+    c for c in df_model_encoded.columns
+    if c.startswith("make_group_")
+    or c.startswith("body_group_")
+]
+
+feature_cols = feature_cols + dummy_cols
+
+X = df_model_encoded[feature_cols]
+y = df_model_encoded["target"]
+
+
+```
+
+
+#### RQ1: Are certain vehicle makes or body styles more likely to be linked to certain types of violations?
+
+```{python}
+#| echo: false
+#| warning: false
+#| message: false
+#| output: false
+
+ct_counts = pd.crosstab(
+    df_model["body_group"],
+    df_model["violation_group"]
+)
+
+chi2, p, dof, expected = chi2_contingency(ct_counts)
+
+n = ct_counts.sum().sum()
+min_dim = min(ct_counts.shape) - 1
+
+cramers_v = np.sqrt(chi2 / (n * min_dim))
+
+print("Chi-square statistic:", chi2)
+print("p-value:", p)
+print("Degrees of freedom:", dof)
+print("Cramer's V:", cramers_v)
+
+ct_make = pd.crosstab(
+    df_model["make_group"],
+    df_model["violation_group"]
+)
+
+chi2_m, p_m, dof_m, expected_m = chi2_contingency(ct_make)
+
+n_m = ct_make.sum().sum()
+min_dim_m = min(ct_make.shape) - 1
+
+cramers_v_m = np.sqrt(chi2_m / (n_m * min_dim_m))
+
+# print("Chi-square statistic (make):", chi2_m)
+# print("p-value (make):", p_m)
+# print("Degrees of freedom (make):", dof_m)
+# print("Cramer's V (make):", cramers_v_m)
+```
+
+Vehicle characteristics are statistically associated with violation types, but the strength of this relationship is weak in practice.
+To assess this relationship, chi-square tests are conducted. The results indicate statistically significant associations for both body type (Chi-Square = 105568.83, p < 0.001) and vehicle make (Chi-Square  = 208967.46, p < 0.001). However, the effect sizes are small, with Cramer’s V equal to 0.064 for body type and 0.070 for vehicle make. This indicates weak practical associations.
+From a descriptive perspective, citation activity is highly concentrated in a small number of violation categories. “NO PARK/STREET CLEAN” accounts for 28% of citations, followed by “METER EXP.” (15%) and “RED ZONE” (12%), indicating that enforcement activity is focused on a limited set of recurring violations.
+Vehicle characteristics also exhibit strong structural patterns. Passenger cars account for the vast majority of citations, while the rest of each vehicle type represents smaller proportions. Among vehicle makes, Toyota, Honda, and Ford are the most frequently cited. It shows their prevalence in urban traffic.
+Overall, these results suggest that although differences in violation distributions exist across vehicle groups, vehicle characteristics are not strong predictors of violation types.
+
+
+#### RQ2: How has the number of parking violations changed from 2021 to 2025?
+
+Parking citation fluctuates substantially from 2021 to 2025. It suggests a seasonal pattern, with higher citation volumes tending to occur around the beginning of the year. The most noticeable peak occurs in early 2022, followed by repeated rises and declines in later years.
+
+```{python}
+#| echo: false
+#| warning: false
+#| message: false
+df_complete["year_month"] = pd.to_datetime(
+    df_complete[["year", "month"]].assign(day=1)
+)
+
+monthly_ts = (
+    df_complete
+    .groupby("year_month")
+    .size()
+    .reset_index(name="n_citations")
+    .sort_values("year_month")
+)
+
+
+monthly_ts = monthly_ts.iloc[:-1]
+
+```
+
+```{python}
+#| echo: false
+#| warning: false
+#| message: false
+#| eval: false
+plt.figure(figsize=(8,3))
+sns.lineplot(data=monthly_ts, x="year_month", y="n_citations")
+
+plt.xlabel("Year-Month")
+plt.ylabel("Number of Citations")
+
+plt.xticks(rotation=45)
+
+plt.tight_layout()
+plt.savefig("outputs/time_series.png", dpi=120, bbox_inches="tight")
+plt.show()
+```
+
+Monthly citation counts generally range between approximately 120,000 and 180,000 observations. Citation volumes remain relatively stable in 2021, followed by a noticeable increase in early 2022. After this peak, citation activity declines through late 2022 and reaches a local minimum in early 2023. From 2023 to 2025, citation counts continue to exhibit substantial variability, with recurring increases and decreases over time. Overall, these patterns suggest cyclical variation and may reflect seasonal effects rather than a sustained upward or downward trend.
+
+![Monthly parking citation counts (2021–2025) The series exhibits substantial monthly variation, with a peak in early 2022.](outputs/time_series.png){#fig-timeseries fig-pos="H"}
+
+
+#### RQ3: Do parking violations tend to cluster in certain geographic regions of the City of Los Angeles?
+
+
+Parking violations are not uniformly distributed across the city and show clear spatial clustering in specific regions.
+High density clusters are observed in central urban areas, particularly around downtown Los Angeles. Additional localized clusters are visible in areas such as West Hollywood and Santa Monica, indicating concentrated enforcement activity beyond the city center. In contrast, areas farther from the center have much lower citation densities. This distribution suggests that parking violations are concentrated in high density urban and commercial regions rather than being randomly distributed across the city. Overall, the results indicate that parking violations tend to cluster geographically. It might reflects variations in traffic density, parking demand, and enforcement intensity across different parts of the city.
+
+```{python}
+#| echo: false
+#| warning: false
+#| message: false 
+
+
+df_geo = df_complete[
+    (df_complete["loc_lat"].between(33.8, 34.2)) &
+    (df_complete["loc_long"].between(-118.5, -118.1))
+].copy()
+
+lat_bin_size = 0.005
+lon_bin_size = 0.005
+
+df_geo["lat_bin"] = (df_geo["loc_lat"] / lat_bin_size).round() * lat_bin_size
+df_geo["lon_bin"] = (df_geo["loc_long"] / lon_bin_size).round() * lon_bin_size
+
+
+grid_counts = (
+    df_geo
+    .groupby(["lat_bin", "lon_bin"])
+    .size()
+    .reset_index(name="n_citations")
+)
+
+grid_counts = grid_counts[grid_counts["n_citations"] >= 20]
+
+```
+
+![Gried-Based spatial concentration of Parking Citations in LA Core Area It presents a grid-based spatial distribution of citation counts across the Los Angeles core area.](outputs/map.png){#fig-map fig-pos="H"}
+
+```{python}
+#| echo: false
+#| warning: false
+#| message: false
+#| eval: false
+
+fig = px.scatter_mapbox(
+    grid_counts,
+    lat="lat_bin",
+    lon="lon_bin",
+    size="n_citations",
+    color="n_citations",
+    color_continuous_scale="Viridis",
+    size_max=18,
+    zoom=10,
+    center={"lat": 34.0522, "lon": -118.2437},
+    mapbox_style="carto-positron",
+    hover_data={
+        "lat_bin": True,
+        "lon_bin": True,
+        "n_citations": True
+    }
+)
+
+fig.update_layout(
+    height=650,
+    margin={"r":0, "t":50, "l":0, "b":0}
+)
+
+fig.show()
+```
+
+
+#### RQ4: To what extent can parking violation types be predicted using temporal, vehicle, and spatial features?
+
+
+```{python}
+#| echo: false
+#| warning: false
+#| message: false
+#| output: false
+X_trainval, X_test, y_trainval, y_test = train_test_split(
+    X,
+    y,
+    test_size=0.20,
+    random_state=65,
+    stratify=y
+)
+
+X_train, X_val, y_train, y_val = train_test_split(
+    X_trainval,
+    y_trainval,
+    test_size=0.25,
+    random_state=65,
+    stratify=y_trainval
+)
+
+print("Train:", X_train.shape)
+print("Validation:", X_val.shape)
+print("Test:", X_test.shape)
+
+
+X_train_small, _, y_train_small, _ = train_test_split(
+    X_train,
+    y_train,
+    train_size=min(200_000, len(X_train)),
+    random_state=65,
+    stratify=y_train
+)
+
+X_val_small, _, y_val_small, _ = train_test_split(
+    X_val,
+    y_val,
+    train_size=min(100_000, len(X_val)),
+    random_state=65,
+    stratify=y_val
+)
+
+full_tree = DecisionTreeClassifier(
+    max_depth=12,
+    min_samples_split=200,
+    min_samples_leaf=200,
+    class_weight="balanced",
+    random_state=65
+)
+
+full_tree.fit(X_train_small, y_train_small)
+
+y_pred_full_val = full_tree.predict(X_val_small)
+
+print("Full Tree Validation Accuracy:", accuracy_score(y_val_small, y_pred_full_val))
+print("Full Tree Validation Macro F1:", f1_score(y_val_small, y_pred_full_val, average="macro"))
+print("Leaves:", full_tree.get_n_leaves())
+print("Depth:", full_tree.get_depth())
+
+print(classification_report(
+    y_val_small,
+    y_pred_full_val,
+    target_names=le.classes_,
+    zero_division=0
+))
+```
+
+```{python}
+#| echo: false
+#| warning: false
+#| message: false
+#| output: false
+# plt.figure(figsize=(24, 10))
+
+# plot_tree(
+#     full_tree,
+#     feature_names=feature_cols,
+#     class_names=le.classes_,
+#     filled=True,
+#     rounded=True,
+#     max_depth=2,
+#     fontsize=8
+# )
+
+# plt.title("Baseline Classification Tree for Violation Group (Top 3 Levels)")
+# plt.tight_layout()
+# plt.show()
+```
+
+```{python}
+#| echo: false
+#| warning: false
+#| message: false
+#| output: false
+path = full_tree.cost_complexity_pruning_path(X_train_small, y_train_small)
+ccp_alphas = path.ccp_alphas
+ccp_alphas_pos = ccp_alphas[ccp_alphas > 0]
+
+log_alphas = np.logspace(
+    np.log10(ccp_alphas_pos.min()),
+    np.log10(ccp_alphas_pos.max()),
+    10
+)
+
+records = []
+
+for alpha in log_alphas:
+    tree = DecisionTreeClassifier(
+        max_depth=12,
+        min_samples_split=200,
+        min_samples_leaf=200,
+        class_weight="balanced",
+        random_state=65,
+        ccp_alpha=alpha
+    )
+    
+    tree.fit(X_train_small, y_train_small)
+
+    y_train_pred = tree.predict(X_train_small)
+    y_val_pred = tree.predict(X_val_small)
+
+    records.append({
+        "ccp_alpha": alpha,
+        "n_leaves": tree.get_n_leaves(),
+        "depth": tree.get_depth(),
+        "train_acc": accuracy_score(y_train_small, y_train_pred),
+        "val_acc": accuracy_score(y_val_small, y_val_pred),
+        "val_macro_f1": f1_score(y_val_small, y_val_pred, average="macro")
+    })
+
+ccp_df = pd.DataFrame(records)
+
+print(ccp_df)
+```
+
+
+```{python}
+#| echo: false
+#| warning: false
+#| message: false
+#| output: false
+optimal_row = ccp_df.loc[ccp_df["val_macro_f1"].idxmax()]
+optimal_alpha = optimal_row["ccp_alpha"]
+
+print("Chosen alpha:", optimal_alpha)
+print(optimal_row)
+```
+
+```{python}
+#| echo: false
+#| warning: false
+#| message: false
+#| output: false
+#| fig-show: hide
+plt.figure(figsize=(8, 3))
+
+plt.plot(ccp_df["ccp_alpha"], ccp_df["train_acc"], marker="o", label="Train Accuracy")
+plt.plot(ccp_df["ccp_alpha"], ccp_df["val_acc"], marker="o", label="Validation Accuracy")
+plt.plot(ccp_df["ccp_alpha"], ccp_df["val_macro_f1"], marker="o", label="Validation Macro F1")
+
+plt.xscale("log")
+plt.xlabel("ccp_alpha")
+plt.ylabel("Score")
+
+plt.legend()
+plt.tight_layout()
+plt.savefig("outputs/cost_complexity.png", dpi=120, bbox_inches="tight")
+plt.show()
+```
+
+<!-- ![Confusion Matrix — XGBoost Classifier As ccp_alpha increases, both training and validation performance decline, indicating that excessive pruning reduces model complexity but leads to underfitting.](outputs/confusion_matrix.png){#fig-cost fig-pos="H"}
+-->
+
+
+
+```{python}
+#| echo: false
+#| warning: false
+#| message: false
+#| output: false
+ 
+pruned_tree = DecisionTreeClassifier(
+    max_depth=12,
+    min_samples_split=200,
+    min_samples_leaf=200,
+    class_weight="balanced",
+    random_state=65,
+    ccp_alpha=optimal_alpha
+)
+
+pruned_tree.fit(X_train, y_train)
+
+y_pred_pruned = pruned_tree.predict(X_test)
+
+print("Pruned Tree Test Accuracy:", accuracy_score(y_test, y_pred_pruned))
+print("Pruned Tree Test Macro F1:", f1_score(y_test, y_pred_pruned, average="macro"))
+print("Leaves:", pruned_tree.get_n_leaves())
+print("Depth:", pruned_tree.get_depth())
+
+print(classification_report(
+    y_test,
+    y_pred_pruned,
+    target_names=le.classes_,
+    zero_division=0
+))
+```
+
+
+
+```{python}
+#| echo: false
+#| warning: false
+#| message: false
+#| output: false
+
+# plt.figure(figsize=(24, 10))
+
+# plot_tree(
+#     pruned_tree,
+#     feature_names=feature_cols,
+#     class_names=le.classes_,
+#     filled=True,
+#     rounded=True,
+#     max_depth=3,
+#     fontsize=8
+# )
+
+# plt.title("Final Pruned Classification Tree for Violation Group")
+# plt.tight_layout()
+# plt.show()
+```
+
+
+```{python}
+#| echo: false
+#| warning: false
+#| message: false
+#| output: false
+#| 
+X_train_xgb, _, y_train_xgb, _ = train_test_split(
+    X_train,
+    y_train,
+    train_size=min(500_000, len(X_train)),
+    random_state=65,
+    stratify=y_train
+)
+
+X_val_xgb, _, y_val_xgb, _ = train_test_split(
+    X_val,
+    y_val,
+    train_size=min(200_000, len(X_val)),
+    random_state=65,
+    stratify=y_val
+)
+
+sample_weight = compute_sample_weight(
+    class_weight="balanced",
+    y=y_train_xgb
+)
+
+print("XGB train sample:", X_train_xgb.shape)
+print("XGB validation sample:", X_val_xgb.shape)
+```
+
+
+```{python}
+#| echo: false
+#| warning: false
+#| message: false
+#| output: false
+xgb_base = XGBClassifier(
+    objective="multi:softprob",
+    num_class=len(le.classes_),
+    n_estimators=300,
+    max_depth=6,
+    learning_rate=0.1,
+    subsample=0.8,
+    colsample_bytree=0.8,
+    eval_metric="mlogloss",
+    tree_method="hist",
+    device="cuda",     
+    random_state=65,
+    n_jobs=-1
+)
+
+xgb_base.fit(
+    X_train_xgb,
+    y_train_xgb,
+    sample_weight=sample_weight,
+    eval_set=[(X_val_xgb, y_val_xgb)],
+    verbose=False
+)
+
+y_val_pred_xgb = xgb_base.predict(X_val_xgb)
+
+print("XGBoost Validation Accuracy:", accuracy_score(y_val_xgb, y_val_pred_xgb))
+print("XGBoost Validation Macro F1:", f1_score(y_val_xgb, y_val_pred_xgb, average="macro"))
+
+print(classification_report(
+    y_val_xgb,
+    y_val_pred_xgb,
+    target_names=le.classes_,
+    zero_division=0
+))
+```
+
+
+```{python}
+#| echo: false
+#| warning: false
+#| message: false
+#| output: false
+param_grid = [
+    {"max_depth": 4, "learning_rate": 0.10, "subsample": 0.8, "colsample_bytree": 0.8},
+    {"max_depth": 6, "learning_rate": 0.10, "subsample": 0.8, "colsample_bytree": 0.8},
+    {"max_depth": 8, "learning_rate": 0.05, "subsample": 0.8, "colsample_bytree": 0.8},
+    {"max_depth": 6, "learning_rate": 0.05, "subsample": 0.9, "colsample_bytree": 0.9},
+]
+
+xgb_results = []
+
+for params in param_grid:
+    model = XGBClassifier(
+        objective="multi:softprob",
+        num_class=len(le.classes_),
+        n_estimators=500,
+        eval_metric="mlogloss",
+        tree_method="hist",
+        device="cuda",       
+        random_state=65,
+        n_jobs=-1,
+        **params
+    )
+
+    model.fit(
+        X_train_xgb,
+        y_train_xgb,
+        sample_weight=sample_weight,
+        eval_set=[(X_val_xgb, y_val_xgb)],
+        verbose=False
+    )
+
+    pred = model.predict(X_val_xgb)
+
+    xgb_results.append({
+        **params,
+        "val_acc": accuracy_score(y_val_xgb, pred),
+        "val_macro_f1": f1_score(y_val_xgb, pred, average="macro")
+    })
+
+xgb_tune_df = pd.DataFrame(xgb_results).sort_values("val_macro_f1", ascending=False)
+
+print(xgb_tune_df)
+
+best_xgb_params = xgb_tune_df.iloc[0][
+    ["max_depth", "learning_rate", "subsample", "colsample_bytree"]
+].to_dict()
+
+best_xgb_params["max_depth"] = int(best_xgb_params["max_depth"])
+
+print("Best XGBoost params:")
+print(best_xgb_params)
+```
+
+
+```{python}
+#| echo: false
+#| warning: false
+#| message: false
+#| output: false
+n_sample = 300_000 
+
+idx = np.random.choice(
+    len(X_trainval),
+    size=n_sample,
+    replace=False
+)
+
+X_trainval_xgb = X_trainval.iloc[idx]
+y_trainval_xgb = y_trainval.iloc[idx]
+
+final_weight = compute_sample_weight(
+    class_weight="balanced",
+    y=y_trainval_xgb
+)
+
+xgb_final = XGBClassifier(
+    objective="multi:softprob",
+    num_class=len(le.classes_),
+    n_estimators=700,
+    eval_metric="mlogloss",
+    tree_method="hist",
+    device="cuda",        
+    random_state=65,
+    n_jobs=-1,
+    **best_xgb_params
+)
+
+xgb_final.fit(
+    X_trainval_xgb,
+    y_trainval_xgb,
+    sample_weight=final_weight,
+    verbose=False
+)
+```
+
+
+```{python}
+#| echo: false
+#| warning: false
+#| message: false
+#| output: false
+y_pred_xgb_test = xgb_final.predict(X_test)
+
+xgb_test_acc = accuracy_score(y_test, y_pred_xgb_test)
+xgb_test_macro_f1 = f1_score(y_test, y_pred_xgb_test, average="macro")
+
+print("Final XGBoost Test Accuracy:", xgb_test_acc)
+print("Final XGBoost Test Macro F1:", xgb_test_macro_f1)
+
+print(classification_report(
+    y_test,
+    y_pred_xgb_test,
+    target_names=le.classes_,
+    zero_division=0
+))
+```
+
+
+```{python}
+#| echo: false
+#| warning: false
+#| message: false
+#| eval: false
+cm = confusion_matrix(y_test, y_pred_xgb_test)
+
+fig, ax = plt.subplots(figsize=(6,6))
+
+ConfusionMatrixDisplay(
+    confusion_matrix=cm,
+    display_labels=le.classes_
+).plot(
+    ax=ax,
+    cmap="Blues",
+    xticks_rotation=60,
+    colorbar=False
+)
+
+
+plt.tight_layout()
+plt.savefig("outputs/confusion_matrix.png", dpi=120, bbox_inches="tight")
+plt.show()
+```
+
+<!-- ![Confusion Matrix — XGBoost Classifier The confusion matrix shows that the model performs well on major classes such as “NO PARK/STREET CLEAN” and “PREFERENTIAL PARKING,” but there is substantial misclassification into the “OTHER” category.](outputs/confusion_matrix.png){#fig-conf fig-pos="H"}
+-->
+
+```{python}
+#| echo: false
+#| warning: false
+#| message: false
+#| eval: false
+
+xgb_importance = pd.Series(
+    xgb_final.feature_importances_,
+    index=feature_cols
+).sort_values(ascending=False)
+
+top_imp = xgb_importance.head(20)
+
+plt.figure(figsize=(8, 4))
+top_imp.sort_values().plot(kind="barh")
+plt.xlabel("Feature Importance")
+
+
+plt.tight_layout()
+plt.savefig("outputs/feature_importance.png", dpi=120, bbox_inches="tight")
+plt.show()
+
+# print(top_imp)
+```
+
+
+
+```{python}
+#| echo: false
+#| warning: false
+#| message: false
+#| output: false
+model_comparison = pd.DataFrame({
+    "Model": [
+        "Pruned Decision Tree",
+        "XGBoost Classifier"
+    ],
+    "Test Accuracy": [
+        accuracy_score(y_test, y_pred_pruned),
+        xgb_test_acc
+    ],
+    "Test Macro F1": [
+        f1_score(y_test, y_pred_pruned, average="macro"),
+        xgb_test_macro_f1
+    ]
+})
+
+print(model_comparison)
+```
+
+Parking violation types can be predicted with moderate accuracy using temporal, vehicle, and spatial features. The pruned Decision Tree achieves a test accuracy of 0.549 and a macro-averaged F1-score of 0.457. In contrast, the final XGBoost classifier improves performance to a test accuracy of 0.643 and a macro-averaged F1-score of 0.570. This indicates that the ensemble model captures stronger predictive patterns than the single-tree baseline.
+
+The classification results also show that predictive performance varies substantially across violation categories. XGBoost performs best for “NO PARK/STREET CLEAN,” with an F1-score of 0.83, and “PREFERENTIAL PARKING,” with an F1-score of 0.76. It also performs reasonably well for “METER EXP.”, with an F1-score of 0.68. In contrast, performance is much weaker for “DISPLAY OF PLATES,” with an F1-score of 0.12. This indicates that this category is more difficult to distinguish using the available features.
+The confusion matrix further shows that some categories are frequently confused with “OTHER,” especially lower-performing classes such as “DISPLAY OF PLATES” and “RED ZONE.” This suggests that the available temporal, spatial, and vehicle related variables contain useful predictive information, but they do not fully separate all violation types.
+Feature importance from the XGBoost model indicates that hour is the most important predictor, followed by California plate status, body group, latitude, longitude, and distance from downtown. This suggests that temporal and spatial variables are especially important for predicting violation group, while vehicle characteristics also contribute to the classification task.
+Overall, the results show that parking violation types are predictable to a moderate extent. XGBoost improves substantially over the Decision Tree baseline, but the moderate macro-F1 score indicates that prediction remains challenging for less distinctive or more heterogeneous violation categories.
+
+![Top 20 feature importances from the XGBoost model Hour and location-related variables (latitude, longitude, and distance to downtown) are the most influential predictors, while vehicle-related features contribute less.](outputs/feature_importance.png){#fig-importance fig-pos="H"}
+
+
+### Conclusion and summary
+
+This study analyzes parking citation data in Los Angeles from 2021 to 2025 and identifies clear structural patterns across time, space, and violation types. Citation activity follows both seasonal cycles. A small number of violation categories account for a large proportion of citations, and violations are geographically concentrated in dense urban areas such as downtown Los Angeles.
+Besides, the predictive modeling shows that violation types can be predicted with moderate accuracy using temporal, spatial, and vehicle features. The XGBoost model outperforms the Decision Tree, indicating the importance of nonlinear relationships.
+Overall, parking violations are not randomly distributed but reflect underlying urban dynamics, including traffic patterns, parking demand, and enforcement intensity.
+Several limitations should be noted. First, the data reflect enforcement activity rather than true violation behavior, which may introduce bias. Second, removing missing values may affect data representativeness. Third, the model only uses basic features and does not include external factors such as traffic or policy changes, which may limit predictive performance.
+Future work could incorporate additional contextual variables and more advanced modeling approaches to improve both prediction and interpretation.

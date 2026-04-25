@@ -4,9 +4,9 @@
 
 ## Overview
 
-This project analyzes parking citation data from the City of Los Angeles between 2021 and 2025. The goal is to explore temporal, spatial, and violation type patterns in parking enforcement using real-world administrative data.
+This project analyzes parking citation data from the City of Los Angeles between 2021 and 2025. The goal is to explore temporal, spatial, and violation type patterns in parking enforcement using real-world data.
 
-This project was completed as part of JSC 370 and uses the official Socrata Open Data API (SODA) to programmatically acquire the dataset.
+This project was completed as part of JSC 370 and uses the official Socrata Open Data API (SODA) to acquire the dataset.
 
 ---
 
