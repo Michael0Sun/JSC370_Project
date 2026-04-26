@@ -1,0 +1,1355 @@
+---
+title: "Los Angeles Parking Citation Analysis"
+subtitle: "Temporal, Spatial, and Predictive Patterns in Parking Enforcement, 2021–2025"
+format:
+  html:
+    page-layout: full
+    toc: false
+    smooth-scroll: true
+    code-fold: false
+    code-tools: false
+    theme: cosmo
+    embed-resources: false
+execute:
+  echo: false
+  warning: false
+  message: false
+jupyter: python3
+---
+
+```{python}
+import os
+import numpy as np
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+import plotly.io as pio
+from plotly.subplots import make_subplots
+
+OUTPUT_DIR = "outputs"
+
+pio.templates["parking_clean"] = pio.templates["plotly_white"]
+
+pio.templates["parking_clean"].layout.update(
+    font=dict(
+        family="Inter, Arial, sans-serif",
+        size=14,
+        color="#24324A"
+    ),
+    title=dict(
+        font=dict(size=20, color="#172033"),
+        x=0.02,
+        xanchor="left"
+    ),
+    paper_bgcolor="white",
+    plot_bgcolor="white",
+    xaxis=dict(
+        showgrid=True,
+        gridcolor="#EEF2F7",
+        zeroline=False,
+        linecolor="#CBD5E1"
+    ),
+    yaxis=dict(
+        showgrid=False,
+        gridcolor="#EEF2F7",
+        zeroline=False,
+        linecolor="#CBD5E1"
+    ),
+    legend=dict(
+        bgcolor="rgba(255,255,255,0)",
+        borderwidth=0
+    )
+)
+
+pio.templates.default = "parking_clean"
+
+BLUE = "#2563EB"
+TEAL = "#14B8A6"
+NAVY = "#172033"
+SLATE = "#64748B"
+
+LIGHT_BLUE_SCALE = [
+    "#DBEAFE",
+    "#93C5FD",
+    "#60A5FA",
+    "#3B82F6",
+    "#1D4ED8"
+]
+
+CYAN_SCALE = [
+    "#E0F2FE",
+    "#7DD3FC",
+    "#38BDF8",
+    "#0EA5E9",
+    "#0369A1"
+]
+
+TEAL_SCALE = [
+    "#CCFBF1",
+    "#5EEAD4",
+    "#2DD4BF",
+    "#14B8A6",
+    "#0F766E"
+]
+
+MIX_SCALE = [
+    "#E0F2FE",
+    "#BAE6FD",
+    "#7DD3FC",
+    "#38BDF8",
+    "#2563EB",
+    "#1E3A8A"
+]
+
+
+def read_csv_required(filename: str) -> pd.DataFrame:
+    path = os.path.join(OUTPUT_DIR, filename)
+    if not os.path.exists(path):
+        raise FileNotFoundError(
+            f"Missing {path}. Run `python prepare_dashboard_data.py` first."
+        )
+    return pd.read_csv(path)
+
+
+summary = read_csv_required("summary_metrics.csv").iloc[0]
+cleaning_funnel = read_csv_required("cleaning_funnel.csv")
+missing_summary = read_csv_required("missing_summary.csv")
+
+fine_hist = read_csv_required("fine_hist.csv")
+fine_zoom_hist = read_csv_required("fine_zoom_hist.csv")
+fine_sample = read_csv_required("fine_sample.csv")
+fine_bounds = read_csv_required("fine_bounds.csv").iloc[0]
+
+top_desc = read_csv_required("top_desc.csv")
+make_counts = read_csv_required("make_counts.csv")
+body_counts = read_csv_required("body_counts.csv")
+monthly_ts = read_csv_required("monthly_ts.csv")
+hour_counts = read_csv_required("hour_counts.csv")
+grid_counts = read_csv_required("grid_counts.csv")
+
+model_comparison = read_csv_required("model_comparison.csv")
+ccp_df = read_csv_required("cost_complexity_values.csv")
+feature_importance_df = read_csv_required("feature_importance_values.csv")
+cm_df = pd.read_csv(os.path.join(OUTPUT_DIR, "confusion_matrix_values.csv"), index_col=0)
+
+monthly_ts["year_month"] = pd.to_datetime(monthly_ts["year_month"])
+```
+
+```{python}
+#| output: false
+
+SOFT_BLUE_SCALE = [
+    "#EFF6FF",
+    "#DBEAFE",
+    "#BFDBFE",
+    "#93C5FD",
+    "#60A5FA",
+    "#3B82F6"
+]
+
+MAKE_COLORS = [
+    "#2563EB", "#60A5FA", "#93C5FD", "#BFDBFE", "#DBEAFE",
+    "#14B8A6", "#5EEAD4", "#99F6E4", "#FBBF24", "#FDBA74"
+]
+
+BODY_COLORS = [
+    "#14B8A6", "#5EEAD4", "#99F6E4", "#CCFBF1",
+    "#60A5FA", "#93C5FD", "#FBBF24", "#FDBA74"
+]
+
+
+fig_funnel = go.Figure(
+    go.Funnel(
+        y=cleaning_funnel["Stage"],
+        x=cleaning_funnel["Records"],
+        text=cleaning_funnel["Retention"].map(lambda x: f"{x:.1%} retained"),
+        marker=dict(color=[BLUE, TEAL, "#0EA5E9"]),
+        hovertemplate="<b>%{y}</b><br>Records: %{x:,.0f}<br>%{text}<extra></extra>",
+    )
+)
+fig_funnel.update_layout(
+    title="Data Cleaning Funnel",
+    height=360,
+    margin=dict(l=20, r=20, t=60, b=25)
+)
+
+
+missing_plot = missing_summary.sort_values("Missing Percent", ascending=True).tail(12)
+
+fig_missing = px.bar(
+    missing_plot,
+    x="Missing Percent",
+    y="Variable",
+    orientation="h",
+    text=missing_plot["Missing Percent"].map(lambda x: f"{x:.1%}"),
+    color="Missing Percent",
+    color_continuous_scale=CYAN_SCALE,
+    title="Missingness by Variable",
+)
+fig_missing.update_layout(
+    height=360,
+    coloraxis_showscale=False,
+    xaxis_title="Missing percent",
+    yaxis_title="",
+    margin=dict(l=20, r=35, t=60, b=35)
+)
+fig_missing.update_traces(textposition="outside", marker_line_width=0)
+
+
+fig_fine = make_subplots(
+    rows=1,
+    cols=2,
+    subplot_titles=("Full fine amount distribution", "Zoomed distribution ≤ $200"),
+)
+
+fig_fine.add_trace(
+    go.Bar(
+        x=fine_hist["bin"],
+        y=fine_hist["count"],
+        marker_color=BLUE,
+        name="All fines",
+        hovertemplate="Bin: %{x}<br>Count: %{y:,.0f}<extra></extra>",
+    ),
+    row=1,
+    col=1,
+)
+
+fig_fine.add_trace(
+    go.Bar(
+        x=fine_zoom_hist["bin"],
+        y=fine_zoom_hist["count"],
+        marker_color=TEAL,
+        name="≤ $200",
+        hovertemplate="Bin: %{x}<br>Count: %{y:,.0f}<extra></extra>",
+    ),
+    row=1,
+    col=2,
+)
+
+fig_fine.update_layout(
+    title="Fine Amount Distributions",
+    height=430,
+    showlegend=False,
+    bargap=0.03,
+    margin=dict(l=40, r=35, t=75, b=50)
+)
+fig_fine.update_xaxes(showticklabels=False, title_text="Fine amount bins")
+fig_fine.update_yaxes(title_text="Frequency", row=1, col=1)
+fig_fine.update_yaxes(title_text="Frequency", row=1, col=2)
+
+
+fig_box = go.Figure()
+fig_box.add_trace(
+    go.Box(
+        x=fine_sample["fine_amount"],
+        name="Fine amount ≤ $200",
+        boxpoints="outliers",
+        marker_color=BLUE,
+        line_color=NAVY,
+        hovertemplate="Fine: %{x}<extra></extra>",
+    )
+)
+
+fig_box.add_vline(
+    x=float(fine_bounds["lower"]),
+    line_dash="dash",
+    line_color="#E11D48",
+    annotation_text="Lower IQR bound"
+)
+fig_box.add_vline(
+    x=float(fine_bounds["upper"]),
+    line_dash="dash",
+    line_color="#E11D48",
+    annotation_text="Upper IQR bound"
+)
+
+fig_box.update_layout(
+    title="Fine Amount Boxplot with IQR Bounds",
+    height=310,
+    xaxis_title="Fine amount",
+    yaxis_title="",
+    margin=dict(l=40, r=35, t=70, b=45)
+)
+
+
+# ============================================================
+# Top Violation Categories: soft treemap
+# ============================================================
+
+fig_violation = px.treemap(
+    top_desc,
+    path=["Violation Description"],
+    values="Percentage",
+    color="Percentage",
+    color_continuous_scale=SOFT_BLUE_SCALE,
+    title="Top Violation Categories"
+)
+
+fig_violation.update_layout(
+    height=520,
+    margin=dict(l=20, r=20, t=70, b=20),
+    coloraxis_showscale=False
+)
+
+fig_violation.update_traces(
+    texttemplate="<b>%{label}</b><br>%{value:.1%}",
+    textfont=dict(color="#172033", size=14),
+    marker=dict(line=dict(color="white", width=2)),
+    hovertemplate="<b>%{label}</b><br>Share: %{value:.2%}<extra></extra>"
+)
+
+
+# ============================================================
+# Vehicle Make and Body Style: two donut charts
+# ============================================================
+
+fig_vehicle = make_subplots(
+    rows=1,
+    cols=2,
+    specs=[[{"type": "domain"}, {"type": "domain"}]],
+    subplot_titles=("Vehicle Make Distribution", "Body Style Distribution")
+)
+
+fig_vehicle.add_trace(
+    go.Pie(
+        labels=make_counts["Make"],
+        values=make_counts["Percentage"],
+        hole=0.52,
+        marker=dict(
+            colors=MAKE_COLORS[:len(make_counts)],
+            line=dict(color="white", width=2)
+        ),
+        textinfo="label+percent",
+        textposition="inside",
+        insidetextorientation="radial",
+        hovertemplate="<b>%{label}</b><br>Share: %{value:.2%}<extra></extra>",
+        name="Vehicle Make"
+    ),
+    row=1,
+    col=1
+)
+
+fig_vehicle.add_trace(
+    go.Pie(
+        labels=body_counts["Body Style"],
+        values=body_counts["Percentage"],
+        hole=0.52,
+        marker=dict(
+            colors=BODY_COLORS[:len(body_counts)],
+            line=dict(color="white", width=2)
+        ),
+        textinfo="label+percent",
+        textposition="inside",
+        insidetextorientation="radial",
+        hovertemplate="<b>%{label}</b><br>Share: %{value:.2%}<extra></extra>",
+        name="Body Style"
+    ),
+    row=1,
+    col=2
+)
+
+fig_vehicle.update_layout(
+    title="Vehicle Make and Body Style Composition",
+    height=520,
+    margin=dict(l=20, r=20, t=80, b=20),
+    showlegend=False,
+    annotations=[
+        dict(
+            text="Vehicle Make",
+            x=0.19,
+            y=0.5,
+            font=dict(size=15, color="#172033"),
+            showarrow=False
+        ),
+        dict(
+            text="Body Style",
+            x=0.81,
+            y=0.5,
+            font=dict(size=15, color="#172033"),
+            showarrow=False
+        )
+    ]
+)
+
+
+fig_time = px.line(
+    monthly_ts,
+    x="year_month",
+    y="n_citations",
+    markers=True,
+    title="Monthly Parking Citation Counts, 2021–2025",
+    labels={
+        "year_month": "Year-Month",
+        "n_citations": "Number of citations"
+    }
+)
+
+fig_time.update_traces(
+    line=dict(color=BLUE, width=3),
+    marker=dict(size=7, color=TEAL, line=dict(width=1.2, color="white")),
+    hovertemplate="<b>%{x|%b %Y}</b><br>Citations: %{y:,.0f}<extra></extra>"
+)
+
+fig_time.update_layout(
+    height=460,
+    margin=dict(l=35, r=35, t=75, b=50),
+    xaxis=dict(
+        rangeslider=dict(visible=True),
+        rangeselector=dict(
+            buttons=[
+                dict(count=6, label="6m", step="month", stepmode="backward"),
+                dict(count=1, label="1y", step="year", stepmode="backward"),
+                dict(count=2, label="2y", step="year", stepmode="backward"),
+                dict(step="all"),
+            ]
+        )
+    )
+)
+
+
+fig_hour = px.bar(
+    hour_counts,
+    x="hour",
+    y="n_citations",
+    color="n_citations",
+    color_continuous_scale=TEAL_SCALE,
+    title="Citations by Hour of Day",
+)
+
+fig_hour.update_layout(
+    height=360,
+    coloraxis_showscale=False,
+    xaxis_title="Hour",
+    yaxis_title="Number of citations",
+    margin=dict(l=40, r=35, t=70, b=45)
+)
+
+fig_hour.update_traces(
+    marker_line_width=0,
+    hovertemplate="<b>Hour %{x}:00</b><br>Citations: %{y:,.0f}<extra></extra>"
+)
+
+
+fig_map = px.scatter_mapbox(
+    grid_counts,
+    lat="lat_bin",
+    lon="lon_bin",
+    size="n_citations",
+    color="n_citations",
+    color_continuous_scale=MIX_SCALE,
+    size_max=17,
+    zoom=10,
+    center={"lat": 34.0522, "lon": -118.2437},
+    mapbox_style="carto-positron",
+    hover_data={
+        "lat_bin": ":.4f",
+        "lon_bin": ":.4f",
+        "n_citations": ":,"
+    },
+    title="Grid-Based Spatial Concentration of Parking Citations",
+)
+
+fig_map.update_layout(
+    height=650,
+    margin={"r": 0, "t": 65, "l": 0, "b": 0},
+    coloraxis_colorbar=dict(
+        title="Citations",
+        thickness=14,
+        len=0.72
+    )
+)
+
+fig_map.update_traces(
+    marker=dict(opacity=0.78),
+    hovertemplate=(
+        "<b>Grid cell</b><br>"
+        "Latitude: %{lat:.4f}<br>"
+        "Longitude: %{lon:.4f}<br>"
+        "Citations: %{marker.color:,.0f}"
+        "<extra></extra>"
+    )
+)
+
+
+fig_model = go.Figure()
+
+fig_model.add_trace(go.Bar(
+    x=model_comparison["Model"],
+    y=model_comparison["Test Accuracy"],
+    name="Test Accuracy",
+    marker_color=BLUE,
+    text=model_comparison["Test Accuracy"].map(lambda x: f"{x:.3f}"),
+    textposition="outside",
+    hovertemplate="<b>%{x}</b><br>Test Accuracy: %{y:.3f}<extra></extra>"
+))
+
+fig_model.add_trace(go.Bar(
+    x=model_comparison["Model"],
+    y=model_comparison["Macro F1"],
+    name="Macro F1",
+    marker_color=TEAL,
+    text=model_comparison["Macro F1"].map(lambda x: f"{x:.3f}"),
+    textposition="outside",
+    hovertemplate="<b>%{x}</b><br>Macro F1: %{y:.3f}<extra></extra>"
+))
+
+fig_model.update_layout(
+    barmode="group",
+    title="Model Performance Comparison",
+    yaxis_title="Score",
+    height=430,
+    margin=dict(l=35, r=35, t=75, b=50),
+    yaxis=dict(range=[0, 0.75]),
+    legend=dict(
+        orientation="h",
+        yanchor="bottom",
+        y=1.02,
+        xanchor="right",
+        x=1
+    )
+)
+
+
+fig_ccp = go.Figure()
+
+fig_ccp.add_trace(go.Scatter(
+    x=ccp_df["ccp_alpha"],
+    y=ccp_df["train_acc"],
+    mode="lines+markers",
+    name="Train accuracy",
+    line=dict(color=BLUE, width=3)
+))
+
+fig_ccp.add_trace(go.Scatter(
+    x=ccp_df["ccp_alpha"],
+    y=ccp_df["val_acc"],
+    mode="lines+markers",
+    name="Validation accuracy",
+    line=dict(color=TEAL, width=3)
+))
+
+fig_ccp.add_trace(go.Scatter(
+    x=ccp_df["ccp_alpha"],
+    y=ccp_df["val_macro_f1"],
+    mode="lines+markers",
+    name="Validation macro-F1",
+    line=dict(color="#F59E0B", width=3)
+))
+
+fig_ccp.update_layout(
+    title="Cost Complexity Pruning Path",
+    height=430,
+    xaxis_type="log",
+    xaxis_title="ccp_alpha",
+    yaxis_title="Score",
+    margin=dict(l=35, r=35, t=75, b=50),
+    legend=dict(
+        orientation="h",
+        yanchor="bottom",
+        y=1.02,
+        xanchor="right",
+        x=1
+    )
+)
+
+
+feature_plot_df = feature_importance_df.sort_values("Importance", ascending=True)
+
+fig_feature = go.Figure()
+
+for _, row in feature_plot_df.iterrows():
+    fig_feature.add_trace(go.Scatter(
+        x=[0, row["Importance"]],
+        y=[row["Feature"], row["Feature"]],
+        mode="lines",
+        line=dict(color="#BAE6FD", width=4),
+        showlegend=False,
+        hoverinfo="skip"
+    ))
+
+fig_feature.add_trace(go.Scatter(
+    x=feature_plot_df["Importance"],
+    y=feature_plot_df["Feature"],
+    mode="markers+text",
+    marker=dict(
+        size=11,
+        color=feature_plot_df["Importance"],
+        colorscale=CYAN_SCALE,
+        line=dict(width=1, color="white")
+    ),
+    text=feature_plot_df["Importance"].map(lambda x: f"{x:.3f}"),
+    textposition="middle right",
+    showlegend=False,
+    hovertemplate="<b>%{y}</b><br>Importance: %{x:.4f}<extra></extra>"
+))
+
+fig_feature.update_layout(
+    title="Top 20 XGBoost Feature Importances",
+    height=620,
+    xaxis_title="Feature importance",
+    yaxis_title="",
+    margin=dict(l=20, r=70, t=75, b=45)
+)
+
+fig_feature.update_xaxes(showgrid=True, gridcolor="#EEF2F7", zeroline=False)
+fig_feature.update_yaxes(showgrid=False)
+
+
+fig_cm = px.imshow(
+    cm_df,
+    text_auto=True,
+    color_continuous_scale=LIGHT_BLUE_SCALE,
+    title="XGBoost Confusion Matrix"
+)
+
+fig_cm.update_layout(
+    height=520,
+    xaxis_title="Predicted class",
+    yaxis_title="True class",
+    margin=dict(l=35, r=35, t=75, b=50)
+)
+
+fig_cm.update_traces(
+    hovertemplate="True: %{y}<br>Predicted: %{x}<br>Count: %{z:,.0f}<extra></extra>"
+)
+```
+
+```{=html}
+<style>
+:root {
+  --bg: #f6f8fb;
+  --card: rgba(255, 255, 255, 0.88);
+  --text: #172033;
+  --muted: #64748b;
+  --line: rgba(148, 163, 184, 0.26);
+  --accent: #2563eb;
+  --accent2: #14b8a6;
+  --soft-blue: rgba(37, 99, 235, 0.10);
+  --soft-teal: rgba(20, 184, 166, 0.10);
+  --shadow: 0 24px 60px rgba(15, 23, 42, 0.10);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  min-height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  scroll-behavior: smooth;
+}
+
+body {
+  background:
+    radial-gradient(circle at top left, rgba(37, 99, 235, 0.14), transparent 34rem),
+    radial-gradient(circle at top right, rgba(20, 184, 166, 0.12), transparent 32rem),
+    var(--bg);
+  color: var(--text);
+}
+
+.quarto-title-block,
+#title-block-header {
+  display: none;
+}
+
+.page-columns,
+.page-full,
+.quarto-container,
+main.content,
+#quarto-content,
+#quarto-document-content {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.page-wrap {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 1.25rem 4rem;
+}
+
+.nav-glass {
+  position: sticky;
+  top: 0;
+  z-index: 999;
+  backdrop-filter: blur(18px);
+  background: rgba(246, 248, 251, 0.78);
+  border-bottom: 1px solid var(--line);
+  margin: 0 -1.25rem 2rem;
+  padding: 0.85rem 1.25rem;
+}
+
+.nav-inner {
+  max-width: 1180px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+}
+
+.brand {
+  font-weight: 850;
+  letter-spacing: -0.035em;
+  color: var(--text);
+}
+
+.nav-links {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.nav-links a {
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.nav-links a:hover {
+  color: var(--accent);
+}
+
+.hero {
+  min-height: 72vh;
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  gap: 2rem;
+  align-items: center;
+}
+
+.eyebrow {
+  display: inline-flex;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.42rem 0.72rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--accent);
+  background: rgba(255, 255, 255, 0.66);
+  font-size: 0.9rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+}
+
+.hero h1 {
+  font-size: clamp(2.65rem, 6vw, 5.6rem);
+  line-height: 0.94;
+  letter-spacing: -0.075em;
+  margin-bottom: 1.15rem;
+  color: var(--text);
+}
+
+.hero p {
+  font-size: 1.12rem;
+  color: var(--muted);
+  max-width: 720px;
+  line-height: 1.65;
+}
+
+.hero-visual {
+  position: relative;
+  min-height: 460px;
+  border-radius: 2rem;
+  overflow: hidden;
+  background:
+    linear-gradient(140deg, rgba(37, 99, 235, 0.16), rgba(20, 184, 166, 0.12)),
+    rgba(255, 255, 255, 0.56);
+  box-shadow: var(--shadow);
+  border: 1px solid var(--line);
+}
+
+.orb {
+  position: absolute;
+  border-radius: 999px;
+  opacity: 0.72;
+  filter: blur(0.5px);
+  animation: float 8s ease-in-out infinite;
+}
+
+.orb.one {
+  width: 210px;
+  height: 210px;
+  left: 44px;
+  top: 70px;
+  background: rgba(37, 99, 235, 0.38);
+}
+
+.orb.two {
+  width: 160px;
+  height: 160px;
+  right: 58px;
+  top: 148px;
+  background: rgba(20, 184, 166, 0.36);
+  animation-delay: -2s;
+}
+
+.orb.three {
+  width: 110px;
+  height: 110px;
+  left: 205px;
+  bottom: 76px;
+  background: rgba(59, 130, 246, 0.24);
+  animation-delay: -4s;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0) translateX(0); }
+  50% { transform: translateY(-22px) translateX(10px); }
+}
+
+.glass-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  border-radius: 1.6rem;
+  padding: 1.25rem;
+}
+
+.hero-stat-card {
+  position: absolute;
+  left: 42px;
+  right: 42px;
+  bottom: 38px;
+}
+
+.hero-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  text-align: center;
+}
+
+.stat-number {
+  font-size: 1.8rem;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  color: var(--text);
+}
+
+.stat-label {
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.section {
+  margin: 4.8rem 0;
+}
+
+.section-head {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 1.5rem;
+  margin-bottom: 1.4rem;
+}
+
+.section h2 {
+  font-size: clamp(1.9rem, 3vw, 3rem);
+  letter-spacing: -0.055em;
+  margin-bottom: 0.3rem;
+  color: var(--text);
+}
+
+.section-lead {
+  color: var(--muted);
+  max-width: 760px;
+  margin: 0;
+  line-height: 1.7;
+}
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+}
+
+.metric-card {
+  min-height: 148px;
+}
+
+.metric-card .value {
+  font-size: 2rem;
+  font-weight: 900;
+  letter-spacing: -0.045em;
+  color: var(--text);
+}
+
+.metric-card .label {
+  color: var(--muted);
+  font-size: 0.92rem;
+  font-weight: 650;
+}
+
+.metric-card .note {
+  margin-top: 0.7rem;
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.55;
+}
+
+.two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
+}
+
+.three-col {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.25rem;
+}
+
+.insight {
+  padding: 1rem 1.1rem;
+  border-left: 4px solid var(--accent);
+  background: rgba(37, 99, 235, 0.06);
+  border-radius: 1rem;
+  color: #334155;
+  line-height: 1.65;
+}
+
+.plot-card {
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 1.4rem;
+  box-shadow: var(--shadow);
+  padding: 1rem;
+  overflow: hidden;
+}
+
+.hw5-caption {
+  margin: 0.9rem 0 1.4rem;
+  padding: 0.9rem 1rem;
+  border-left: 4px solid var(--accent2);
+  background: rgba(20, 184, 166, 0.07);
+  border-radius: 0.9rem;
+  color: #334155;
+  line-height: 1.6;
+}
+
+.hw5-caption strong {
+  color: var(--text);
+}
+
+.reveal {
+  opacity: 0;
+  transition: opacity 0.7s ease;
+}
+
+.reveal.visible {
+  opacity: 1;
+}
+
+.pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.pill {
+  padding: 0.45rem 0.72rem;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.08);
+  color: #1d4ed8;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.footer {
+  color: var(--muted);
+  border-top: 1px solid var(--line);
+  padding-top: 2rem;
+  margin-top: 5rem;
+}
+
+.js-plotly-plot,
+.plotly,
+.plotly-graph-div,
+.cell,
+.cell-output,
+.cell-output-display {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+}
+
+@media (max-width: 900px) {
+  .hero,
+  .two-col,
+  .three-col,
+  .card-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .hero {
+    min-height: auto;
+    padding-top: 2rem;
+  }
+
+  .hero-visual {
+    min-height: 360px;
+  }
+
+  .nav-links {
+    display: none;
+  }
+}
+</style>
+
+<div class="page-wrap">
+
+<nav class="nav-glass">
+  <div class="nav-inner">
+    <div class="brand">LA Parking Citation Analysis</div>
+    <div class="nav-links">
+      <a href="#overview">Overview</a>
+      <a href="#cleaning">Cleaning</a>
+      <a href="#eda">EDA</a>
+      <a href="#time">Temporal</a>
+      <a href="#space">Spatial</a>
+      <a href="#model">Model</a>
+      <a href="#conclusion">Conclusion</a>
+    </div>
+  </div>
+</nav>
+
+<section class="hero">
+  <div>
+    <div class="eyebrow">2021–2025 · City of Los Angeles</div>
+    <h1>Parking violations are structured, not random.</h1>
+    <p>
+      This web report provides an overview of patterns in Los Angeles parking citation data, focusing on time trends, location patterns, vehicle characteristics, and predictive results.
+    </p>
+    <div class="pill-row" style="margin-top: 1.4rem;">
+      <span class="pill">Exploratory Analysis</span>
+      <span class="pill">Spatial Clustering</span>
+      <span class="pill">Decision Tree</span>
+      <span class="pill">XGBoost</span>
+    </div>
+  </div>
+
+  <div class="hero-visual">
+    <div class="orb one"></div>
+    <div class="orb two"></div>
+    <div class="orb three"></div>
+
+    <div class="glass-card hero-stat-card">
+      <div class="hero-stat-grid">
+        <div>
+          <div class="stat-number">9.23M</div>
+          <div class="stat-label">raw citations</div>
+        </div>
+        <div>
+          <div class="stat-number">93.18%</div>
+          <div class="stat-label">retained after cleaning</div>
+        </div>
+        <div>
+          <div class="stat-number">$74.04</div>
+          <div class="stat-label">average fine</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+```
+
+```{=html}
+<section id="overview" class="section reveal">
+  <div class="section-head">
+    <div>
+      <h2>Overview</h2>
+      <p class="section-lead">
+        The analysis is based on cleaned Los Angeles parking citation data and examines major violation types, changes over time, spatial concentration, and underlying predictive patterns.
+      </p>
+    </div>
+  </div>
+
+  <div class="card-grid">
+    <div class="glass-card metric-card">
+      <div class="value">8.61M</div>
+      <div class="label">complete observations</div>
+      <div class="note">After listwise deletion and basic plausibility checks.</div>
+    </div>
+    <div class="glass-card metric-card">
+      <div class="value">13</div>
+      <div class="label">selected variables</div>
+      <div class="note">Reduced from the raw dataset for analysis efficiency.</div>
+    </div>
+    <div class="glass-card metric-card">
+      <div class="value">0.064</div>
+      <div class="label">Cramer’s V: body type</div>
+      <div class="note">Statistically significant, but practically weak.</div>
+    </div>
+    <div class="glass-card metric-card">
+      <div class="value">0.070</div>
+      <div class="label">Cramer’s V: vehicle make</div>
+      <div class="note">Vehicle make has limited explanatory strength.</div>
+    </div>
+  </div>
+</section>
+
+<section id="cleaning" class="section reveal">
+  <div class="section-head">
+    <div>
+      <h2>Data Cleaning</h2>
+      <p class="section-lead">
+        The raw records are reduced through variable selection, listwise deletion, and geographic plausibility checks.
+      </p>
+    </div>
+  </div>
+</section>
+```
+
+```{python}
+fig_funnel
+```
+
+```{python}
+fig_missing
+```
+
+```{=html}
+<section id="eda" class="section reveal">
+  <div class="section-head">
+    <div>
+      <h2>Fine Amounts and Violation Types</h2>
+      <p class="section-lead">
+        Fine amounts are concentrated in a relatively narrow range between $60 and $80.
+      </p>
+    </div>
+  </div>
+</section>
+```
+
+```{python}
+fig_fine
+```
+
+```{python}
+fig_box
+```
+
+```{python}
+fig_violation
+```
+
+```{=html}
+<div id="interactive-fig-1" class="hw5-caption">
+  <strong>Interactive Figure 1. Vehicle Make and Body Style Composition.</strong><br>
+  This interactive figure compares the most common vehicle makes and body styles in the cleaned citation data. Hovering over each slice shows the exact share for each category.
+</div>
+```
+
+```{python}
+fig_vehicle
+```
+
+```{=html}
+<div class="insight reveal" style="margin-top: 1.25rem;">
+  Key point: citation activity is not evenly distributed across violation categories.
+  A few categories explain a large share of total citations.
+</div>
+
+<section id="time" class="section reveal">
+  <div class="section-head">
+    <div>
+      <h2>Temporal Pattern</h2>
+      <p class="section-lead">
+        Monthly citation counts fluctuate across 2021–2025 rather than following a simple monotonic trend.
+      </p>
+    </div>
+  </div>
+</section>
+```
+
+```{=html}
+<div id="interactive-fig-2" class="hw5-caption">
+  <strong>Interactive Figure 2. Monthly Parking Citation Counts, 2021–2025.</strong><br>
+  This interactive line chart shows how citation counts change over time. The range slider allows readers to zoom into specific periods and compare short-term seasonal movement.
+</div>
+```
+
+```{python}
+fig_time
+```
+
+```{python}
+fig_hour
+```
+
+```{=html}
+<div class="insight reveal" style="margin-top: 1.25rem;">
+    Monthly citation counts vary noticeably, with a clear peak in early 2022 followed by repeated increasing and decreasing pattern. It suggests cyclical or seasonal effects rather than a steady long term linear trend.
+</div>
+
+<section id="space" class="section reveal">
+  <div class="section-head">
+    <div>
+      <h2>Spatial Concentration</h2>
+      <p class="section-lead">
+        Citations are geographically clustered, especially around dense urban and commercial areas.
+      </p>
+    </div>
+  </div>
+</section>
+```
+
+
+```{=html}
+<div id="interactive-fig-3" class="hw5-caption">
+  <strong>Interactive Figure 3. Grid-Based Spatial Concentration of Parking Citations.</strong><br>
+  This interactive map shows where citations are geographically concentrated across Los Angeles. Larger and darker markers represent grid cells with more citation records.
+</div>
+```
+```{python}
+fig_map
+```
+
+```{=html}
+<div class="two-col reveal" style="margin-top: 1.25rem;">
+  <div class="glass-card">
+    <h3>Interpretation</h3>
+    <p>
+      The spatial pattern suggests that parking violations are concentrated in dense urban regions,
+      especially near downtown Los Angeles and other commercial zones.
+    </p>
+    <div class="pill-row">
+      <span class="pill">Downtown LA</span>
+      <span class="pill">Commercial density</span>
+      <span class="pill">Parking demand</span>
+      <span class="pill">Enforcement intensity</span>
+    </div>
+  </div>
+
+  <div class="glass-card">
+    <h3>Reading the map</h3>
+    <p>
+      Larger and darker markers indicate grid cells with more citations. Hover over each point
+      to inspect the local citation count.
+    </p>
+  </div>
+</div>
+
+<section id="model" class="section reveal">
+  <div class="section-head">
+    <div>
+      <h2>Predictive Modeling</h2>
+      <p class="section-lead">
+        Violation groups are predicted using temporal, spatial, vehicle, and plate-related features.
+        XGBoost improves over the interpretable Decision Tree baseline.
+      </p>
+    </div>
+  </div>
+</section>
+```
+
+```{python}
+fig_model
+```
+
+```{python}
+fig_ccp
+```
+
+```{python}
+fig_feature
+```
+
+```{python}
+fig_cm
+```
+
+```{=html}
+<div class="two-col reveal" style="margin-top: 1.25rem;">
+  <div class="glass-card">
+    <h3>Main modeling result</h3>
+    <p>
+      The pruned Decision Tree reaches 0.549 test accuracy and 0.457 macro-F1.
+      XGBoost improves performance to 0.643 test accuracy and 0.570 macro-F1.
+    </p>
+    <p>
+      This indicates useful predictive signal, but some violation categories remain difficult
+      to separate with the available variables.
+    </p>
+  </div>
+
+  <div class="glass-card">
+    <h3>Feature interpretation</h3>
+    <p>
+      The strongest predictors are related to time, plate status, location, and vehicle grouping.
+      This suggests that violation type is shaped by a combination of enforcement timing,
+      urban geography, and vehicle characteristics.
+    </p>
+  </div>
+</div>
+
+<section id="conclusion" class="section reveal">
+  <div class="section-head">
+    <div>
+      <h2>Conclusion</h2>
+      <p class="section-lead">
+        Parking violations in Los Angeles reflect structured urban patterns rather than random behavior.
+      </p>
+    </div>
+  </div>
+
+  <div class="three-col">
+    <div class="glass-card">
+      <h3>Temporal</h3>
+      <p>Citation counts vary over time, with recurring monthly movement and no simple linear trend.</p>
+    </div>
+    <div class="glass-card">
+      <h3>Spatial</h3>
+      <p>Violations cluster in dense urban regions, especially around central and commercial areas.</p>
+    </div>
+    <div class="glass-card">
+      <h3>Modeling</h3>
+      <p>XGBoost outperforms the Decision Tree baseline, but prediction remains moderate.</p>
+    </div>
+  </div>
+
+  <div class="insight" style="margin-top: 1.25rem;">
+    Limitation: the data reflect enforcement activity rather than all true parking violations.
+    Missing data removal and the absence of external variables may also limit interpretation.
+  </div>
+</section>
+
+<div class="footer">
+  <p>
+    Built with Quarto, HTML, CSS, JavaScript, and Plotly. Data source: City of Los Angeles parking citation records.
+  </p>
+</div>
+
+</div>
+
+<script>
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.classList.add("visible");
+      setTimeout(() => window.dispatchEvent(new Event("resize")), 120);
+    }
+  });
+}, { threshold: 0.12 });
+
+document.querySelectorAll(".reveal").forEach(el => observer.observe(el));
+
+document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+  anchor.addEventListener("click", function(e) {
+    const target = document.querySelector(this.getAttribute("href"));
+    if (target) {
+      e.preventDefault();
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  });
+});
+</script>
+```
