@@ -963,6 +963,16 @@ main.content,
   font-weight: 700;
 }
 
+a.pill {
+  text-decoration: none;
+  display: inline-block;
+}
+
+a.pill:hover {
+  background: rgba(37, 99, 235, 0.14);
+  color: #1e40af;
+}
+
 .footer {
   color: var(--muted);
   border-top: 1px solid var(--line);
@@ -1028,7 +1038,14 @@ main.content,
     <p>
       This web report provides an overview of patterns in Los Angeles parking citation data, focusing on time trends, location patterns, vehicle characteristics, and predictive results.
     </p>
+
     <div class="pill-row" style="margin-top: 1.4rem;">
+      <a class="pill" href="Final_report.pdf" target="_blank">Download Final Report</a>
+      <a class="pill" href="Midterm_report.html" target="_blank">View Midterm Report</a>
+      <a class="pill" href="https://github.com/Michael0Sun/JSC370_Project" target="_blank">GitHub Repository</a>
+    </div>
+
+    <div class="pill-row" style="margin-top: 0.8rem;">
       <span class="pill">Exploratory Analysis</span>
       <span class="pill">Spatial Clustering</span>
       <span class="pill">Decision Tree</span>
