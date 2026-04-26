@@ -1041,6 +1041,10 @@ a.pill:hover {
 
     <div class="pill-row" style="margin-top: 1.4rem;">
       <a class="pill" href="Final_report.pdf" target="_blank">Download Final Report</a>
+      <a class="pill" href="https://www.youtube.com/watch?v=8MkUJywHDYs" target="_blank">Watch Demo vedio</a>
+    </div>
+    
+    <div class="pill-row" style="margin-top: 1.4rem;">
       <a class="pill" href="Midterm_report.html" target="_blank">View Midterm Report</a>
       <a class="pill" href="https://github.com/Michael0Sun/JSC370_Project" target="_blank">GitHub Repository</a>
     </div>
